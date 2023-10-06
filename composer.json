@@ -14,5 +14,7 @@
             "email": "ataufik135@gmail.com"
         }
     ],
-    "require": {}
+    "require": {},
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
