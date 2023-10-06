@@ -1,13 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\SSO;
+namespace TaufikT\SsoClient\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-class SSOController extends Controller
+class SSOController
 {
   public function redirect(Request $request)
   {

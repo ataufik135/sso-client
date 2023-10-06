@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Middleware\SSO;
+namespace TaufikT\SsoClient\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;

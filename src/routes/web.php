@@ -1,19 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use App\Http\Controllers\SSO\SSOController;
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
+use TaufikT\SsoClient\Http\Controllers\SSOController;
 
 Route::controller(SSOController::class)->group(function () {
   Route::prefix('/oauth2')->group(function () {
@@ -22,10 +10,3 @@ Route::controller(SSOController::class)->group(function () {
     Route::get('/logout', 'logout')->name('oauth2.logout')->middleware('sso.auth');
   });
 });
-
-// Route::get('/userinfo', 'userInfo')->name('userinfo')->middleware(['sso.auth', 'sso.role:user']);
-// Route::get('/authuser', [SSOController::class, 'connectUser']);
-
-// Route::get('/', function () {
-//   return view('welcome');
-// })->middleware('sso.auth');

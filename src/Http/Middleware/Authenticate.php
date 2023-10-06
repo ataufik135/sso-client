@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Middleware\SSO;
+namespace TaufikT\SsoClient\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
@@ -25,7 +25,6 @@ class Authenticate
     if ($responses->status() == 200) {
       return $next($request);
     }
-    return redirect()->route('oauth.redirect');
-    // return response()->json(['message' => 'Unauthorized middleware'], 401);
+    return redirect()->route('oauth2.redirect');
   }
 }
