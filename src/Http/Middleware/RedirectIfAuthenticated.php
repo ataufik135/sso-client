@@ -17,16 +17,20 @@ class RedirectIfAuthenticated
    */
   public function handle(Request $request, Closure $next): Response
   {
-    $access_token = $request->session()->get('access_token');
-    $responses = Http::withHeaders([
-      'Accept' => 'application/json',
-      'Authorization' => 'Bearer ' . $access_token
-    ])->get(env('SSO_HOST') . '/api/user');
+    if ($request->session()->has('access_token')) {
+      $access_token = $request->session()->get('access_token');
+      $responses = Http::withHeaders([
+        'Accept' => 'application/json',
+        'Authorization' => 'Bearer ' . $access_token
+      ])->get(env('SSO_HOST') . '/api/user');
 
-    if ($responses->status() != 200) {
-      return $next($request);
+      if ($responses->status() != 200) {
+        return $next($request);
+      }
+
+      return redirect(RouteServiceProvider::HOME);
     }
 
-    return redirect(RouteServiceProvider::HOME);
+    return $next($request);
   }
 }
