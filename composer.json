@@ -13,5 +13,8 @@
             "name": "Taufik",
             "email": "ataufik135@gmail.com"
         }
-    ]
+    ],
+    "require": {
+        "php": ">=7.0.0"
+    }
 }
