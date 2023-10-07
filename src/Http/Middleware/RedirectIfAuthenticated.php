@@ -27,10 +27,8 @@ class RedirectIfAuthenticated
       if ($responses->status() != 200) {
         return $next($request);
       }
-
       return redirect(RouteServiceProvider::HOME);
     }
-
     return $next($request);
   }
 }

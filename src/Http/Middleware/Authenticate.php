@@ -22,13 +22,20 @@ class Authenticate
         'Accept' => 'application/json',
         'Authorization' => 'Bearer ' . $access_token
       ])->get(env('SSO_HOST') . '/api/user');
+      $user = $responses->json();
 
       if ($responses->status() == 200) {
-        return $next($request);
+        $applicationId = env('SSO_CLIENT_ID');
+        foreach ($user['registrations'] as $registration) {
+          if ($registration['applicationId'] === $applicationId) {
+            return $next($request);
+            break;
+          }
+        }
+        return response()->json(['message' => 'Unauthorized'], 403);
       }
-      return redirect()->route('oauth2.redirect');
+      return response()->json(['message' => 'Unauthorized'], 403);
     }
-
     return redirect()->route('oauth2.redirect');
   }
 }

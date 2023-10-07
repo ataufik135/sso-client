@@ -20,7 +20,7 @@ class RoleMiddleware
       $access_token = $request->session()->get('access_token');
 
       if (!$access_token) {
-        return response()->json(['message' => 'Unauthorized'], 403);
+        return redirect()->route('oauth2.redirect');
       }
 
       $responses = Http::withHeaders([
@@ -47,10 +47,8 @@ class RoleMiddleware
       if (count(array_intersect($roles, $userRoles)) > 0) {
         return $next($request);
       }
-
       return response()->json(['message' => 'Unauthorized'], 403);
     }
-
     return response()->json(['message' => 'Unauthorized'], 403);
   }
 }
