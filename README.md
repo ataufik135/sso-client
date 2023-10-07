@@ -2,7 +2,7 @@
 
 Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
 
-##### install
+##### Install
 
     composer require taufik-t/sso-client
 
