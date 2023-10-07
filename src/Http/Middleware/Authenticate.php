@@ -36,7 +36,7 @@ class Authenticate
         }
         return response()->json(['message' => 'Unauthorized'], 403);
       }
-      return response()->json(['message' => 'Unauthorized'], 403);
+      return redirect()->route('oauth2.redirect');
     }
     return redirect()->route('oauth2.redirect');
   }
