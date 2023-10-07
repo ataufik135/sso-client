@@ -22,6 +22,8 @@ class Authenticate
         'Accept' => 'application/json',
         'Authorization' => 'Bearer ' . $access_token
       ])->get(env('SSO_HOST') . '/api/user');
+
+      $request->session()->put($responses->json());
       $user = $responses->json();
 
       if ($responses->status() == 200) {
