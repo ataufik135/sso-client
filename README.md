@@ -2,7 +2,7 @@
 
 Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
 
-##### Install
+##### install
 
     composer require taufik-t/sso-client
 
@@ -53,3 +53,16 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
     {
         $this->middleware(['sso.role:super-admin']);
     }
+
+### Blade directives
+
+    @ssoRole('admin')
+        <a href="{{ url('/admin') }}">Admin</a>
+    @endSsoRole
+    @ssoRole('user|admin')
+        <a href="{{ url('/home') }}">Home</a>
+    @endSsoRole
+
+### Logout URL
+
+    <a href="{{ route('oauth2.logout') }}">Logout</a>
