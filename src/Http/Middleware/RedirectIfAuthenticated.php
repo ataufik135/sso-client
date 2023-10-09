@@ -17,19 +17,22 @@ class RedirectIfAuthenticated
    */
   public function handle(Request $request, Closure $next): Response
   {
-    if ($request->session()->has('access_token')) {
+    if ($request->session()->has('access_token') && $request->session()->has('remember_token')) {
       $access_token = $request->session()->get('access_token');
       $responses = Http::withHeaders([
         'Accept' => 'application/json',
         'Authorization' => 'Bearer ' . $access_token
       ])->get(env('SSO_HOST') . '/api/user');
 
-      $request->session()->put($responses->json());
+      $user = $responses->json();
 
       if ($responses->status() != 200) {
         return $next($request);
+      } elseif (($responses->status() == 200) && ($request->session()->get('remember_token') === $user['remember_token'])) {
+        $request->session()->put($responses->json());
+        return redirect(RouteServiceProvider::HOME);
       }
-      return redirect(RouteServiceProvider::HOME);
+      return redirect()->route('oauth2.logout');
     }
     return $next($request);
   }
