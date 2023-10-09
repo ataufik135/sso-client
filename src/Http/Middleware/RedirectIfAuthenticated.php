@@ -26,13 +26,14 @@ class RedirectIfAuthenticated
 
       $user = $responses->json();
 
-      if ($responses->status() != 200) {
-        return $next($request);
-      } elseif (($responses->status() == 200) && ($request->session()->get('remember_token') === $user['remember_token'])) {
+      if (($responses->status() == 200) && ($request->session()->get('remember_token') == $user['remember_token'])) {
         $request->session()->put($responses->json());
+
         return redirect(RouteServiceProvider::HOME);
+      } elseif (($responses->status() == 200) && ($request->session()->get('remember_token') != $user['remember_token'])) {
+        return redirect()->route('oauth2.logout');
       }
-      return redirect()->route('oauth2.logout');
+      return $next($request);
     }
     return $next($request);
   }

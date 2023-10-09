@@ -25,7 +25,7 @@ class Authenticate
 
       $user = $responses->json();
 
-      if (($responses->status() == 200) && ($request->session()->get('remember_token') === $user['remember_token'])) {
+      if (($responses->status() == 200) && ($request->session()->get('remember_token') == $user['remember_token'])) {
         $request->session()->put($responses->json());
 
         $applicationId = env('SSO_CLIENT_ID');
@@ -36,8 +36,10 @@ class Authenticate
           }
         }
         return response()->json(['message' => 'Unauthorized'], 403);
+      } elseif (($responses->status() == 200) && ($request->session()->get('remember_token') != $user['remember_token'])) {
+        return redirect()->route('oauth2.logout');
       }
-      return redirect()->route('oauth2.logout');
+      return redirect()->route('oauth2.redirect');
     }
     return redirect()->route('oauth2.redirect');
   }
