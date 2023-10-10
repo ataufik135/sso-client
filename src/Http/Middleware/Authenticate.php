@@ -26,7 +26,10 @@ class Authenticate
       $user = $responses->json();
 
       if ($responses->status() == 200) {
-        $responseTokens = Http::get(env('SSO_HOST') . '/oauth/tokens');
+        $responseTokens = Http::withHeaders([
+          'Accept' => 'application/json',
+          'Authorization' => 'Bearer ' . $access_token
+        ])->get(env('SSO_HOST') . '/api/tokens');
 
         if ($responseTokens->status() != 200) {
           return response()->json(['message' => 'Failed to retrieve tokens from SSO Server'], $responseTokens->status());
