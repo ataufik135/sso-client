@@ -26,9 +26,11 @@ class Authenticate
       $user = $responses->json();
 
       if ($responses->status() == 200) {
-        $responseTokens = Http::withHeaders([
-          'Accept' => 'application/json',
-        ])->get(env('SSO_HOST') . '/oauth/tokens');
+        $responseTokens = Http::get(env('SSO_HOST') . '/oauth/tokens');
+
+        if ($responseTokens->status() != 200) {
+          return response()->json(['message' => 'Failed to retrieve tokens from SSO Server'], $responseTokens->status());
+        }
 
         $groupedData = collect($responseTokens)->groupBy('client_id');
         $duplicates = $groupedData->filter(function ($items) {

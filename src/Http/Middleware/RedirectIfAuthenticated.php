@@ -25,7 +25,6 @@ class RedirectIfAuthenticated
       ])->get(env('SSO_HOST') . '/api/user');
 
       if ($responses->status() == 200) {
-
         return redirect(RouteServiceProvider::HOME);
       }
 
