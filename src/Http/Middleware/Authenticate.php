@@ -35,7 +35,8 @@ class Authenticate
           return response()->json(['message' => 'Failed to retrieve tokens from SSO Server'], $responseTokens->status());
         }
 
-        $groupedData = collect($responseTokens)->groupBy('client_id');
+        $tokens = $responseTokens->json();
+        $groupedData = collect($tokens)->groupBy('client_id');
         $duplicates = $groupedData->filter(function ($items) {
           return $items->count() > 1;
         });
