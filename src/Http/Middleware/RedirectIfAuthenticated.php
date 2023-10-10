@@ -24,23 +24,7 @@ class RedirectIfAuthenticated
         'Authorization' => 'Bearer ' . $access_token
       ])->get(env('SSO_HOST') . '/api/user');
 
-      $user = $responses->json();
-
       if ($responses->status() == 200) {
-        $responseTokens = Http::withHeaders([
-          'Accept' => 'application/json',
-        ])->get(env('SSO_HOST') . '/oauth/tokens');
-
-        $groupedData = collect($responseTokens)->groupBy('client_id');
-        $duplicates = $groupedData->filter(function ($items) {
-          return $items->count() > 1;
-        });
-
-        if ($duplicates->isNotEmpty()) {
-          return redirect()->route('oauth2.logout');
-        }
-
-        $request->session()->put($responses->json());
 
         return redirect(RouteServiceProvider::HOME);
       }
