@@ -17,7 +17,7 @@ class RedirectIfAuthenticated
    */
   public function handle(Request $request, Closure $next): Response
   {
-    if ($request->session()->has('access_token') && $request->session()->has('remember_token')) {
+    if ($request->session()->has('access_token')) {
       $access_token = $request->session()->get('access_token');
       $responses = Http::withHeaders([
         'Accept' => 'application/json',
@@ -26,15 +26,28 @@ class RedirectIfAuthenticated
 
       $user = $responses->json();
 
-      if (($responses->status() == 200) && ($request->session()->get('remember_token') == $user['remember_token'])) {
+      if ($responses->status() == 200) {
+        $responseTokens = Http::withHeaders([
+          'Accept' => 'application/json',
+        ])->get(env('SSO_HOST') . '/oauth/tokens');
+
+        $groupedData = collect($responseTokens)->groupBy('client_id');
+        $duplicates = $groupedData->filter(function ($items) {
+          return $items->count() > 1;
+        });
+
+        if ($duplicates->isNotEmpty()) {
+          return redirect()->route('oauth2.logout');
+        }
+
         $request->session()->put($responses->json());
 
         return redirect(RouteServiceProvider::HOME);
-      } elseif (($responses->status() == 200) && ($request->session()->get('remember_token') != $user['remember_token'])) {
-        return redirect()->route('oauth2.logout');
       }
+
       return $next($request);
     }
+
     return $next($request);
   }
 }
