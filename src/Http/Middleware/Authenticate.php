@@ -5,7 +5,6 @@ namespace TaufikT\SsoClient\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\Http;
 
 class Authenticate
 {
@@ -16,51 +15,41 @@ class Authenticate
    */
   public function handle(Request $request, Closure $next): Response
   {
-    if ($request->session()->has('access_token')) {
-      $access_token = $request->session()->get('access_token');
-      $responses = Http::withHeaders([
-        'Accept' => 'application/json',
-        'Authorization' => 'Bearer ' . $access_token
-      ])->get(env('SSO_HOST') . '/api/user');
+    $access_token = session()->get('access_token');
+    $user = session()->get('user');
+    $hasExpired = hasExpired();
 
-      $user = $responses->json();
-
-      if ($responses->status() == 200) {
-        $responseTokens = Http::withHeaders([
-          'Accept' => 'application/json',
-          'Authorization' => 'Bearer ' . $access_token
-        ])->get(env('SSO_HOST') . '/api/tokens');
-
-        if ($responseTokens->status() != 200) {
-          return response()->json(['message' => 'Failed to retrieve tokens from SSO Server'], $responseTokens->status());
-        }
-
-        $tokens = $responseTokens->json();
-        $groupedData = collect($tokens)->groupBy('client_id');
-        $duplicates = $groupedData->filter(function ($items) {
-          return $items->count() > 1;
-        });
-
-        if ($duplicates->isNotEmpty()) {
-          return redirect()->route('oauth2.logout');
-        }
-
-        $request->session()->put($responses->json());
-        $applicationId = env('SSO_CLIENT_ID');
-
-        foreach ($user['registrations'] as $registration) {
-          if ($registration['applicationId'] === $applicationId) {
-            return $next($request);
-            break;
-          }
-        }
-
-        return response()->json(['message' => 'Unauthorized'], 403);
-      }
-
-      return redirect()->route('oauth2.redirect');
+    if (!$user) {
+      return redirect(route('oauth2.redirect'));
     }
 
-    return redirect()->route('oauth2.redirect');
+    $isUserAuthorized = $this->isUserAuthorized($user);
+
+    if (($access_token && !$hasExpired) && $isUserAuthorized) {
+      return $next($request);
+    }
+
+    if (($access_token && !$hasExpired) && !$isUserAuthorized) {
+      return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    if (($access_token && refreshToken()) && $isUserAuthorized) {
+      return $next($request);
+    }
+
+    return redirect(route('oauth2.redirect'));
+  }
+
+  private function isUserAuthorized($user)
+  {
+    $applicationId = env('SSO_CLIENT_ID');
+
+    foreach ($user['registrations'] as $registration) {
+      if ($registration['applicationId'] === $applicationId) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

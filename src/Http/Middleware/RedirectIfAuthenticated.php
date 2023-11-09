@@ -6,7 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Providers\RouteServiceProvider;
-use Illuminate\Support\Facades\Http;
+use TaufikT\SsoClient\Http\Controllers\SSOController;
 
 class RedirectIfAuthenticated
 {
@@ -17,18 +17,21 @@ class RedirectIfAuthenticated
    */
   public function handle(Request $request, Closure $next): Response
   {
-    if ($request->session()->has('access_token')) {
-      $access_token = $request->session()->get('access_token');
-      $responses = Http::withHeaders([
-        'Accept' => 'application/json',
-        'Authorization' => 'Bearer ' . $access_token
-      ])->get(env('SSO_HOST') . '/api/user');
+    $access_token = session()->get('access_token');
+    $hasExpired = hasExpired();
 
-      if ($responses->status() == 200) {
+    if ($access_token && !$hasExpired) {
+      return redirect(RouteServiceProvider::HOME);
+    }
+
+    if ($access_token && $hasExpired) {
+      if (refreshToken()) {
         return redirect(RouteServiceProvider::HOME);
       }
 
-      return $next($request);
+      session()->invalidate();
+      session()->regenerateToken();
+      return redirect(route('oauth2.redirect'));
     }
 
     return $next($request);
