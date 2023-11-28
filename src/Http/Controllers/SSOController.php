@@ -31,46 +31,87 @@ class SSOController
   {
     $state = $request->session()->pull('state');
     throw_unless(strlen($state) > 0 && $state === $request->state, InvalidArgumentException::class);
-    $response = Http::asForm()->post(
-      env('SSO_HOST') . '/oauth/token',
-      [
-        'grant_type' => 'authorization_code',
-        'client_id' => env('SSO_CLIENT_ID'),
-        'client_secret' => env('SSO_CLIENT_SECRET'),
-        'redirect_uri' => env('SSO_CLIENT_CALLBACK'),
-        'code' => $request->code
-      ]
-    );
+
+    $retryCount = 3;
+    $retryDelay = 1;
+    $timeout = 15;
+
+    for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
+      try {
+        $response = Http::withoutVerifying()->timeout($timeout)->asForm()->post(
+          env('SSO_HOST') . '/oauth/token',
+          [
+            'grant_type' => 'authorization_code',
+            'client_id' => env('SSO_CLIENT_ID'),
+            'client_secret' => env('SSO_CLIENT_SECRET'),
+            'redirect_uri' => env('SSO_CLIENT_CALLBACK'),
+            'code' => $request->code
+          ]
+        );
+
+        if ($response->successful()) {
+          break;
+        }
+      } catch (\RequestException $e) {
+        if ($attempt < $retryCount) {
+          sleep($retryDelay);
+        } else {
+          return response()->json(['message' => 'Request failed after $retryCount attempts: ' . $e->getMessage()], 408);
+        }
+      }
+    }
+
     $now = \Carbon\Carbon::now()->toIso8601String();
     session(['auth_at' => $now]);
     $request->session()->put($response->json());
     $access_token = $request->session()->get('access_token');
 
-    $response = Http::withHeaders([
-      'Accept' => 'application/json',
-      'Authorization' => 'Bearer ' . $access_token
-    ])->get(env('SSO_HOST') . '/api/user');
+    for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
+      try {
+        $response = Http::withoutVerifying()->timeout($timeout)->withHeaders([
+          'Accept' => 'application/json',
+          'Authorization' => 'Bearer ' . $access_token
+        ])->get(env('SSO_HOST') . '/api/user');
+
+        if ($response->successful()) {
+          break;
+        }
+      } catch (\RequestException $e) {
+        if ($attempt < $retryCount) {
+          sleep($retryDelay);
+        } else {
+          $request->session()->invalidate();
+          $request->session()->regenerateToken();
+          return response()->json(['message' => 'Unauthorized'], 403);
+        }
+      }
+    }
+
     $user = $response->json();
     $request->session()->put('user', $user);
 
-    if ($response->status() !== 200) {
-      $request->session()->invalidate();
-      $request->session()->regenerateToken();
-      return response()->json(['message' => 'Unauthorized'], 403);
+    for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
+      try {
+        $response = Http::withoutVerifying()->timeout($timeout)->withHeaders([
+          'Accept' => 'application/json',
+          'Authorization' => 'Bearer ' . $access_token
+        ])->get(env('SSO_HOST') . '/api/tokens');
+
+        if ($response->successful()) {
+          break;
+        }
+      } catch (\RequestException $e) {
+        if ($attempt < $retryCount) {
+          sleep($retryDelay);
+        } else {
+          $request->session()->invalidate();
+          $request->session()->regenerateToken();
+          return response()->json(['message' => 'Failed to retrieve tokens from SSO Server'], $response->status());
+        }
+      }
     }
 
-    $responseTokens = Http::withHeaders([
-      'Accept' => 'application/json',
-      'Authorization' => 'Bearer ' . $access_token
-    ])->get(env('SSO_HOST') . '/api/tokens');
-
-    if ($responseTokens->status() !== 200) {
-      $request->session()->invalidate();
-      $request->session()->regenerateToken();
-      return response()->json(['message' => 'Failed to retrieve tokens from SSO Server'], $responseTokens->status());
-    }
-
-    $tokens = $responseTokens->json();
+    $tokens = $response->json();
     $groupedData = collect($tokens)->groupBy('client_id');
     $duplicates = $groupedData->filter(function ($items) {
       return $items->count() > 1;
@@ -106,7 +147,7 @@ class SSOController
 
     if (isset($decrypt)) {
       destroySessionById($decrypt);
-      return response()->json(['message' => 'You have been successfully logged out']);
+      return response()->json(['message' => 'You have been successfully logged out'], 200);
     } else {
       return response()->json(['message' => 'Unauthorized'], 403);
     }

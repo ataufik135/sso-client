@@ -50,20 +50,35 @@ function hasExpired()
 function refreshToken()
 {
   $refresh_token = session()->get('refresh_token');
-  $response = Http::asForm()->post(
-    env('SSO_HOST') . '/oauth/token',
-    [
-      'grant_type' => 'refresh_token',
-      'refresh_token' => $refresh_token,
-      'client_id' => env('SSO_CLIENT_ID'),
-      'client_secret' => env('SSO_CLIENT_SECRET'),
-      'redirect_uri' => env('SSO_CLIENT_CALLBACK'),
-      'scope' => env('SSO_SCOPES'),
-    ]
-  );
 
-  if ($response->status() !== 200) {
-    return false;
+  $retryCount = 3;
+  $retryDelay = 1;
+  $timeout = 15;
+
+  for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
+    try {
+      $response = Http::withoutVerifying()->timeout($timeout)->asForm()->post(
+        env('SSO_HOST') . '/oauth/token',
+        [
+          'grant_type' => 'refresh_token',
+          'refresh_token' => $refresh_token,
+          'client_id' => env('SSO_CLIENT_ID'),
+          'client_secret' => env('SSO_CLIENT_SECRET'),
+          'redirect_uri' => env('SSO_CLIENT_CALLBACK'),
+          'scope' => env('SSO_SCOPES'),
+        ]
+      );
+
+      if ($response->successful()) {
+        break;
+      }
+    } catch (\RequestException $e) {
+      if ($attempt < $retryCount) {
+        sleep($retryDelay);
+      } else {
+        return false;
+      }
+    }
   }
 
   $now = \Carbon\Carbon::now()->toIso8601String();
@@ -71,16 +86,27 @@ function refreshToken()
   session()->put($response->json());
 
   $access_token = session()->get('access_token');
-  $responseTokens = Http::withHeaders([
-    'Accept' => 'application/json',
-    'Authorization' => 'Bearer ' . $access_token
-  ])->get(env('SSO_HOST') . '/api/tokens');
 
-  if ($responseTokens->status() !== 200) {
-    return false;
+  for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
+    try {
+      $response = Http::withoutVerifying()->timeout($timeout)->withHeaders([
+        'Accept' => 'application/json',
+        'Authorization' => 'Bearer ' . $access_token
+      ])->get(env('SSO_HOST') . '/api/tokens');
+
+      if ($response->successful()) {
+        break;
+      }
+    } catch (\RequestException $e) {
+      if ($attempt < $retryCount) {
+        sleep($retryDelay);
+      } else {
+        return false;
+      }
+    }
   }
 
-  $tokens = $responseTokens->json();
+  $tokens = $response->json();
   $groupedData = collect($tokens)->groupBy('client_id');
   $duplicates = $groupedData->filter(function ($items) {
     return $items->count() > 1;
@@ -107,13 +133,27 @@ function getUser()
     }
   }
 
-  $response = Http::withHeaders([
-    'Accept' => 'application/json',
-    'Authorization' => 'Bearer ' . $access_token
-  ])->get(env('SSO_HOST') . '/api/user');
+  $retryCount = 3;
+  $retryDelay = 1;
+  $timeout = 15;
 
-  if ($response->status() !== 200) {
-    return false;
+  for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
+    try {
+      $response = Http::withoutVerifying()->timeout($timeout)->withHeaders([
+        'Accept' => 'application/json',
+        'Authorization' => 'Bearer ' . $access_token
+      ])->get(env('SSO_HOST') . '/api/user');
+
+      if ($response->successful()) {
+        break;
+      }
+    } catch (\RequestException $e) {
+      if ($attempt < $retryCount) {
+        sleep($retryDelay);
+      } else {
+        return false;
+      }
+    }
   }
 
   $user = session()->get('user');
@@ -129,7 +169,7 @@ function getUser()
 
 function destroySessionById($id)
 {
-  $sessionPath = storage_path('framework/sessions');
+  $sessionPath = storage_path('framework' . DIRECTORY_SEPARATOR . 'sessions');
   $sessionFiles = scandir($sessionPath);
 
   foreach ($sessionFiles as $file) {
