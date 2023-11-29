@@ -30,7 +30,11 @@ class SSOController
   public function callback(Request $request)
   {
     $state = $request->session()->pull('state');
-    throw_unless(strlen($state) > 0 && $state === $request->state, InvalidArgumentException::class);
+    throw_unless(
+      strlen($state) > 0 && $state === $request->state,
+      InvalidArgumentException::class,
+      'Invalid state value.'
+    );
 
     $retryCount = 3;
     $retryDelay = 1;
