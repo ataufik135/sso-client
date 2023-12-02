@@ -160,7 +160,7 @@ function getUser()
 
   if (session()->has('user')) {
     $user = session()->get('user');
-    dd($user);
+    dd($user['sessionId'] . '->' . $responseUser['sessionId']);
     if ($user['sessionId'] !== $responseUser['sessionId']) {
       session()->invalidate();
       session()->regenerateToken();
