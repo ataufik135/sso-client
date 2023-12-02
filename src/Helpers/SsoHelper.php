@@ -157,8 +157,9 @@ function getUser()
   }
 
   $user = session()->get('user');
+  $responseUser = $response->json();
   if ($user['sessionId']) {
-    if ($user['sessionId'] !== $response['sessionId']) {
+    if ($user['sessionId'] !== $responseUser['sessionId']) {
       return redirect(route('oauth2.logout'));
     }
   }
