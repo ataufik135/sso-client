@@ -40,20 +40,23 @@ class Authenticate
     return redirect(route('oauth2.redirect'));
   }
 
-  public function isUserAuthorized($user)
+  private function isUserAuthorized($user)
   {
     $applicationId = env('SSO_CLIENT_ID');
 
     foreach ($user['registrations'] as $registration) {
       if ($registration['applicationId'] === $applicationId) {
-        $this->isUserValid();
+        if ($this->isUserValid()) {
+          return true;
+        }
+        return false;
       }
     }
 
     return false;
   }
 
-  public function isUserValid()
+  protected function isUserValid()
   {
     return true;
   }
