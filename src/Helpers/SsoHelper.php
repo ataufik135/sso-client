@@ -162,7 +162,7 @@ function getUser()
     }
     session()->forget('user');
   }
-  session()->put('user', $response->json());
+  session()->put('user', $responseUser);
 
   return true;
 }
