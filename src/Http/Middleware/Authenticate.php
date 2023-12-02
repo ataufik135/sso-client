@@ -40,7 +40,7 @@ class Authenticate
     return redirect(route('oauth2.redirect'));
   }
 
-  private function isUserAuthorized($user)
+  public function isUserAuthorized($user)
   {
     $applicationId = env('SSO_CLIENT_ID');
 
@@ -53,7 +53,7 @@ class Authenticate
     return false;
   }
 
-  protected function isUserValid()
+  public function isUserValid()
   {
     return true;
   }
