@@ -83,6 +83,7 @@ function refreshToken()
 
   $now = \Carbon\Carbon::now()->toIso8601String();
   session(['auth_at' => $now]);
+  session()->put($response->json());
   $access_token = session()->get('access_token');
 
   for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
