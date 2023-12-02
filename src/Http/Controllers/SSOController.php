@@ -20,7 +20,6 @@ class SSOController
       'client_id' => env('SSO_CLIENT_ID'),
       'redirect_uri' => env('SSO_CLIENT_CALLBACK'),
       'response_type' => 'code',
-      //   'prompt' => 'none',
       'scope' => env('SSO_SCOPES'),
       'state' => $state,
     ]);
@@ -30,11 +29,10 @@ class SSOController
   public function callback(Request $request)
   {
     $state = $request->session()->pull('state');
-    throw_unless(
-      strlen($state) > 0 && $state === $request->state,
-      InvalidArgumentException::class,
-      'Invalid state value.'
-    );
+
+    if (strlen($state) < 1 && $state !== $request->state) {
+      return response()->json(['message' => 'Invalid state value.'], 400);
+    }
 
     $retryCount = 3;
     $retryDelay = 1;
@@ -75,30 +73,6 @@ class SSOController
         $response = Http::withoutVerifying()->timeout($timeout)->withHeaders([
           'Accept' => 'application/json',
           'Authorization' => 'Bearer ' . $access_token
-        ])->get(env('SSO_HOST') . '/api/user');
-
-        if ($response->successful()) {
-          break;
-        }
-      } catch (\RequestException $e) {
-        if ($attempt < $retryCount) {
-          sleep($retryDelay);
-        } else {
-          $request->session()->invalidate();
-          $request->session()->regenerateToken();
-          return response()->json(['message' => 'Unauthorized'], 403);
-        }
-      }
-    }
-
-    $user = $response->json();
-    $request->session()->put('user', $user);
-
-    for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
-      try {
-        $response = Http::withoutVerifying()->timeout($timeout)->withHeaders([
-          'Accept' => 'application/json',
-          'Authorization' => 'Bearer ' . $access_token
         ])->get(env('SSO_HOST') . '/api/tokens');
 
         if ($response->successful()) {
@@ -124,6 +98,30 @@ class SSOController
     if ($duplicates->isNotEmpty()) {
       return redirect(route('oauth2.logout'));
     }
+
+    for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
+      try {
+        $response = Http::withoutVerifying()->timeout($timeout)->withHeaders([
+          'Accept' => 'application/json',
+          'Authorization' => 'Bearer ' . $access_token
+        ])->get(env('SSO_HOST') . '/api/user');
+
+        if ($response->successful()) {
+          break;
+        }
+      } catch (\RequestException $e) {
+        if ($attempt < $retryCount) {
+          sleep($retryDelay);
+        } else {
+          $request->session()->invalidate();
+          $request->session()->regenerateToken();
+          return response()->json(['message' => 'Unauthorized'], 403);
+        }
+      }
+    }
+
+    $user = $response->json();
+    $request->session()->put('user', $user);
 
     return redirect(RouteServiceProvider::HOME);
   }

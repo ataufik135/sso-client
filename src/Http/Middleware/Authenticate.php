@@ -46,10 +46,15 @@ class Authenticate
 
     foreach ($user['registrations'] as $registration) {
       if ($registration['applicationId'] === $applicationId) {
-        return true;
+        $this->isUserValid();
       }
     }
 
     return false;
+  }
+
+  protected function isUserValid()
+  {
+    return true;
   }
 }
