@@ -157,8 +157,10 @@ function getUser()
   }
 
   $user = session()->get('user');
-  if ($user['sessionId'] !== $response['sessionId']) {
-    return redirect(route('oauth2.logout'));
+  if ($user['sessionId']) {
+    if ($user['sessionId'] !== $response['sessionId']) {
+      return redirect(route('oauth2.logout'));
+    }
   }
 
   session()->forget('user');
