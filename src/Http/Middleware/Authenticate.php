@@ -33,8 +33,10 @@ class Authenticate
       return response()->json(['message' => 'Unauthorized'], 401);
     }
 
-    if (($access_token && refreshToken()) && $isUserAuthorized) {
-      return $next($request);
+    if (($access_token && $hasExpired) && $isUserAuthorized) {
+      if (refreshToken()) {
+        return $next($request);
+      }
     }
 
     return redirect(route('oauth2.redirect'));

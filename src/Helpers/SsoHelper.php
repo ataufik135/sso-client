@@ -83,8 +83,6 @@ function refreshToken()
 
   $now = \Carbon\Carbon::now()->toIso8601String();
   session(['auth_at' => $now]);
-  session()->put($response->json());
-
   $access_token = session()->get('access_token');
 
   for ($attempt = 1; $attempt <= $retryCount; $attempt++) {
@@ -117,7 +115,9 @@ function refreshToken()
   }
 
   if (!getUser()) {
-    return redirect(route('oauth2.logout'));
+    session()->invalidate();
+    session()->regenerateToken();
+    return false;
   }
 
   return true;
@@ -126,12 +126,6 @@ function refreshToken()
 function getUser()
 {
   $access_token = session()->get('access_token');
-  $hasExpired = hasExpired();
-  if ($hasExpired) {
-    if (!refreshToken()) {
-      return redirect(route('oauth2.logout'));
-    }
-  }
 
   $retryCount = 3;
   $retryDelay = 1;
@@ -160,15 +154,13 @@ function getUser()
 
   if (session()->has('user')) {
     $user = session()->get('user');
-    dd($user['sessionId'] . '->' . $responseUser['sessionId']);
     if ($user['sessionId'] !== $responseUser['sessionId']) {
       session()->invalidate();
       session()->regenerateToken();
       return false;
     }
+    session()->forget('user');
   }
-
-  session()->forget('user');
   session()->put('user', $response->json());
 
   return true;
