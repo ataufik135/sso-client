@@ -156,11 +156,15 @@ function getUser()
     }
   }
 
-  $user = session()->get('user');
   $responseUser = $response->json();
-  if ($user['sessionId']) {
+
+  if (session()->has('user')) {
+    $user = session()->get('user');
+    dd($user);
     if ($user['sessionId'] !== $responseUser['sessionId']) {
-      return redirect(route('oauth2.logout'));
+      session()->invalidate();
+      session()->regenerateToken();
+      return false;
     }
   }
 

@@ -6,7 +6,6 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Providers\RouteServiceProvider;
-use TaufikT\SsoClient\Http\Controllers\SSOController;
 
 class RedirectIfAuthenticated
 {
@@ -18,7 +17,12 @@ class RedirectIfAuthenticated
   public function handle(Request $request, Closure $next): Response
   {
     $access_token = session()->get('access_token');
+    $user = session()->get('user');
     $hasExpired = hasExpired();
+
+    if (!$user) {
+      return $next($request);
+    }
 
     if ($access_token && !$hasExpired) {
       return redirect(RouteServiceProvider::HOME);
