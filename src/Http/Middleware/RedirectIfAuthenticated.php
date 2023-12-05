@@ -6,9 +6,17 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Providers\RouteServiceProvider;
+use TaufikT\SsoClient\OAuthClient;
 
 class RedirectIfAuthenticated
 {
+  protected $oauthClient;
+
+  public function __construct(OAuthClient $oauthClient)
+  {
+    $this->oauthClient = $oauthClient;
+  }
+
   /**
    * Handle an incoming request.
    *
@@ -18,24 +26,22 @@ class RedirectIfAuthenticated
   {
     $access_token = session()->get('access_token');
     $user = session()->get('user');
-    $hasExpired = hasExpired();
+    $isTokenExpired = $this->oauthClient->isTokenExpired();
 
-    if (!$user) {
+    if (!$access_token || !$user) {
       return $next($request);
     }
 
-    if ($access_token && !$hasExpired) {
+    if (!$isTokenExpired) {
       return redirect(RouteServiceProvider::HOME);
     }
 
-    if ($access_token && $hasExpired) {
-      if (refreshToken()) {
-        return redirect(RouteServiceProvider::HOME);
+    if ($refreshToken = $this->oauthClient->refreshToken()) {
+      $this->oauthClient->storeToken($refreshToken);
+      if ($this->oauthClient->isTokenDuplicate()) {
+        $this->oauthClient->reset();
       }
-
-      session()->invalidate();
-      session()->regenerateToken();
-      return redirect(route('oauth2.redirect'));
+      return redirect(RouteServiceProvider::HOME);
     }
 
     return $next($request);

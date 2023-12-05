@@ -5,9 +5,17 @@ namespace TaufikT\SsoClient\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use TaufikT\SsoClient\OAuthClient;
 
 class Authenticate
 {
+  protected $oauthClient;
+
+  public function __construct(OAuthClient $oauthClient)
+  {
+    $this->oauthClient = $oauthClient;
+  }
+
   /**
    * Handle an incoming request.
    *
@@ -17,26 +25,28 @@ class Authenticate
   {
     $access_token = session()->get('access_token');
     $user = session()->get('user');
-    $hasExpired = hasExpired();
+    $isTokenExpired = $this->oauthClient->isTokenExpired();
 
-    if (!$user) {
+    if (!$access_token || !$user) {
       return redirect(route('oauth2.redirect'));
     }
 
     $isUserAuthorized = $this->isUserAuthorized($user);
 
-    if (($access_token && !$hasExpired) && $isUserAuthorized) {
-      return $next($request);
-    }
-
-    if (($access_token && !$hasExpired) && !$isUserAuthorized) {
+    if (!$isUserAuthorized) {
       return response()->json(['message' => 'Unauthorized'], 401);
     }
 
-    if (($access_token && $hasExpired) && $isUserAuthorized) {
-      if (refreshToken()) {
-        return $next($request);
+    if (!$isTokenExpired) {
+      return $next($request);
+    }
+
+    if ($refreshToken = $this->oauthClient->refreshToken()) {
+      $this->oauthClient->storeToken($refreshToken);
+      if ($this->oauthClient->isTokenDuplicate()) {
+        $this->oauthClient->reset();
       }
+      return $next($request);
     }
 
     return redirect(route('oauth2.redirect'));

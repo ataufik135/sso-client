@@ -5,9 +5,17 @@ namespace TaufikT\SsoClient\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use TaufikT\SsoClient\OAuthClient;
 
 class RoleMiddleware
 {
+  protected $oauthClient;
+
+  public function __construct(OAuthClient $oauthClient)
+  {
+    $this->oauthClient = $oauthClient;
+  }
+
   /**
    * Handle an incoming request.
    *
@@ -16,12 +24,8 @@ class RoleMiddleware
   public function handle(Request $request, Closure $next, $role): Response
   {
     $user = session()->get('user');
-    $hasExpired = hasExpired();
-    if (!$user || $hasExpired) {
-      if (!getUser()) {
-        return response()->json(['message' => 'Unauthorized'], 401);
-      }
-      $user = session()->get('user');
+    if (!$user) {
+      return response()->json(['message' => 'Unauthorized'], 401);
     }
 
     $roles = is_array($role) ? $role : explode('|', $role);

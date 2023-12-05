@@ -2,7 +2,7 @@
 
 namespace TaufikT\SsoClient;
 
-include_once(__DIR__ . '/Helpers/SsoHelper.php');
+include_once(__DIR__ . '/Helpers/SSO.php');
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Blade;
@@ -14,7 +14,9 @@ class SSOServiceProvider extends ServiceProvider
    */
   public function register(): void
   {
-    //
+    $this->app->bind('oauthclient', function ($app) {
+      return new OAuthClient();
+    });
   }
 
   /**
