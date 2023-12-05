@@ -12,6 +12,14 @@ class OAuthClient
   private $clientSecret;
   private $redirectUri;
 
+  public function __construct()
+  {
+    $this->host = env('SSO_HOST');
+    $this->clientId = env('SSO_CLIENT_ID');
+    $this->clientSecret = env('SSO_CLIENT_SECRET');
+    $this->redirectUri = env('SSO_CLIENT_CALLBACK');
+  }
+
   public function reset()
   {
     session()->invalidate();
@@ -160,32 +168,6 @@ class OAuthClient
     }
 
     return false;
-  }
-
-  private function getAuthorizationToken()
-  {
-    $this->isTokenExpired() ? $this->refreshToken() : '';
-
-    return session()->get('access_token');
-  }
-
-  private function getOauthAuthorization()
-  {
-    return [
-      'Authorization' => 'Bearer ' . $this->getAuthorizationToken()
-    ];
-  }
-
-  public function request()
-  {
-    $this->host = env('SSO_HOST');
-    $this->clientId = env('SSO_CLIENT_ID');
-    $this->clientSecret = env('SSO_CLIENT_SECRET');
-    $this->redirectUri = env('SSO_CLIENT_CALLBACK');
-
-    return Http::withoutVerifying()->withHeaders(
-      $this->getOauthAuthorization()
-    );
   }
 
   public function logout($token)
