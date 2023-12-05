@@ -10,10 +10,12 @@ use TaufikT\SsoClient\OAuthClient;
 class SSOController
 {
   protected $oauthClient;
+  protected $logoutUri;
 
   public function __construct(OAuthClient $oauthClient)
   {
     $this->oauthClient = $oauthClient;
+    $this->logoutUri = env('SSO_HOST_LOGOUT');
   }
 
   public function redirect(Request $request)
@@ -49,7 +51,10 @@ class SSOController
     }
 
     try {
-      $this->oauthClient->isTokenDuplicate() ? $this->oauthClient->reset() : '';
+      if ($this->oauthClient->isTokenDuplicate()) {
+        $this->oauthClient->reset();
+        return redirect($this->logoutUri);
+      }
     } catch (\Exception $e) {
       //
     }
@@ -59,6 +64,7 @@ class SSOController
       $this->oauthClient->storeUser($getUser);
     } catch (\Exception $e) {
       $this->oauthClient->reset();
+      return redirect($this->logoutUri);
     }
 
     return redirect(RouteServiceProvider::HOME);
@@ -68,7 +74,7 @@ class SSOController
   {
     $request->session()->invalidate();
     $request->session()->regenerateToken();
-    return redirect(env('SSO_HOST_LOGOUT'));
+    return redirect($this->logoutUri);
   }
 
   public function handleLogoutNotification(Request $request)

@@ -10,10 +10,12 @@ use TaufikT\SsoClient\OAuthClient;
 class Authenticate
 {
   protected $oauthClient;
+  protected $logoutUri;
 
   public function __construct(OAuthClient $oauthClient)
   {
     $this->oauthClient = $oauthClient;
+    $this->logoutUri = env('SSO_HOST_LOGOUT');
   }
 
   /**
@@ -25,18 +27,17 @@ class Authenticate
   {
     $access_token = session()->get('access_token');
     $user = session()->get('user');
-    $isTokenExpired = $this->oauthClient->isTokenExpired();
 
     if (!$access_token || !$user) {
       return redirect(route('oauth2.redirect'));
     }
 
     $isUserAuthorized = $this->isUserAuthorized($user);
-
     if (!$isUserAuthorized) {
       return response()->json(['message' => 'Unauthorized'], 401);
     }
 
+    $isTokenExpired = $this->oauthClient->isTokenExpired();
     if (!$isTokenExpired) {
       return $next($request);
     }
@@ -45,6 +46,7 @@ class Authenticate
       $this->oauthClient->storeToken($refreshToken);
       if ($this->oauthClient->isTokenDuplicate()) {
         $this->oauthClient->reset();
+        return redirect($this->logoutUri);
       }
       return $next($request);
     }

@@ -1,20 +1,10 @@
 <?php
 
-use TaufikT\SsoClient\OAuthClient;
-
 function checkSsoRole($role)
 {
-  $oauthClient = new OAuthClient();
-
   $user = session()->get('user');
   if (!$user) {
-    if (!$getUser = $oauthClient->getUserInfo()) {
-      session()->invalidate();
-      session()->regenerateToken();
-      return false;
-    }
-    $oauthClient->storeUser($getUser);
-    $user = session()->get('user');
+    return false;
   }
 
   $roles = is_array($role) ? $role : explode('|', $role);

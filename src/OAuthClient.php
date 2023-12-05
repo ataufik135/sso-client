@@ -16,7 +16,6 @@ class OAuthClient
   {
     session()->invalidate();
     session()->regenerateToken();
-    return redirect()->route('oauth2.logout');
   }
 
   public function storeToken($data)

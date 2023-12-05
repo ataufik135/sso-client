@@ -26,12 +26,12 @@ class RedirectIfAuthenticated
   {
     $access_token = session()->get('access_token');
     $user = session()->get('user');
-    $isTokenExpired = $this->oauthClient->isTokenExpired();
 
     if (!$access_token || !$user) {
       return $next($request);
     }
 
+    $isTokenExpired = $this->oauthClient->isTokenExpired();
     if (!$isTokenExpired) {
       return redirect(RouteServiceProvider::HOME);
     }
