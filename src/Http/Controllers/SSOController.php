@@ -67,6 +67,7 @@ class SSOController
       return redirect($this->logoutUri);
     }
 
+    $request->session()->regenerate();
     return redirect(RouteServiceProvider::HOME);
   }
 
