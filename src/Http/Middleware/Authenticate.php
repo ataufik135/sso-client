@@ -34,7 +34,7 @@ class Authenticate
 
     $isUserAuthorized = $this->isUserAuthorized($user);
     if (!$isUserAuthorized) {
-      return response()->json(['message' => 'Unauthorized'], 401);
+      return response()->json(['message' => 'Unauthorized midle A'], 401);
     }
 
     $isTokenExpired = $this->oauthClient->isTokenExpired();
