@@ -11,11 +11,13 @@ class Authenticate
 {
   protected $oauthClient;
   protected $logoutUri;
+  protected $applicationId;
 
   public function __construct(OAuthClient $oauthClient)
   {
     $this->oauthClient = $oauthClient;
     $this->logoutUri = env('SSO_HOST_LOGOUT');
+    $this->applicationId = env('SSO_CLIENT_ID');
   }
 
   /**
@@ -34,7 +36,7 @@ class Authenticate
 
     $isUserAuthorized = $this->isUserAuthorized($user);
     if (!$isUserAuthorized) {
-      return response()->json(['message' => 'Unauthorized midle A'], 401);
+      return response()->json(['message' => 'Unauthorized'], 401);
     }
 
     $isTokenExpired = $this->oauthClient->isTokenExpired();
@@ -56,10 +58,8 @@ class Authenticate
 
   private function isUserAuthorized($user)
   {
-    $applicationId = env('SSO_CLIENT_ID');
-
     foreach ($user['registrations'] as $registration) {
-      if ($registration['applicationId'] === $applicationId) {
+      if ($registration['applicationId'] === $this->applicationId) {
         if ($this->isUserValid()) {
           return true;
         }
