@@ -63,7 +63,6 @@ class Authenticate
         if ($this->isUserValid()) {
           return true;
         }
-        return false;
       }
     }
 
