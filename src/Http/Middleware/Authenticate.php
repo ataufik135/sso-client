@@ -56,12 +56,21 @@ class Authenticate
     return redirect(route('oauth2.redirect'));
   }
 
+  private function buildApplicationIdIndex($user)
+  {
+    $index = [];
+    foreach ($user['registrations'] as $index => $registration) {
+      $index[$registration['applicationId']] = $index;
+    }
+    return $index;
+  }
+
   private function isUserAuthorized($user)
   {
-    foreach ($user['registrations'] as $registration) {
-      if ($registration['applicationId'] === $this->applicationId) {
-        return $this->isUserValid();
-      }
+    $applicationIdIndex = $this->buildApplicationIdIndex($user);
+
+    if (isset($applicationIdIndex[$this->applicationId])) {
+      return $this->isUserValid();
     }
 
     return false;
