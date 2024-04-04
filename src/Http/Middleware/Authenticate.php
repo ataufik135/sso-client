@@ -59,8 +59,8 @@ class Authenticate
   private function buildApplicationIdIndex($user)
   {
     $index = [];
-    foreach ($user['registrations'] as $index => $registration) {
-      $index[$registration['applicationId']] = $index;
+    foreach ($user['registrations'] as $registration) {
+      $index[$registration['applicationId']] = true;
     }
     return $index;
   }
