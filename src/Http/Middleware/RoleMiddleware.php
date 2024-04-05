@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use TaufikT\SsoClient\OAuthClient;
+use App\Providers\RouteServiceProvider;
 
 class RoleMiddleware
 {
@@ -42,6 +43,8 @@ class RoleMiddleware
     if (count(array_intersect($roles, $userRoles)) > 0) {
       return $next($request);
     }
-    return response()->json(['message' => 'Unauthorized'], 403);
+
+    return redirect(RouteServiceProvider::HOME);
+    // return response()->json(['message' => 'Unauthorized'], 403);
   }
 }
