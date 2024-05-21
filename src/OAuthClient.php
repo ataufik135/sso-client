@@ -152,21 +152,10 @@ class OAuthClient
   {
     $token = base64_decode($token);
 
-    $publicKey = '-----BEGIN PUBLIC KEY-----
-    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2lwcy6IOYhaz4bwOn3f5
-    8HKlF/xwxem5mdBSlWiibmpDYFj8GtHG44s8HQW9/x5E6YwbgRzureeaPeiEHEpb
-    uk18ywsEGrCVGqWFZBHRV/Q1N7Wqg9O4n1hISueGdc8Pu3kNAQn/4FcXnFODzvJY
-    v99CFDDUlUbGCc8k8IYr9gzTktUKfLIAPR1dA7lUruN5b/2opsgvmCnNAhVE2vSV
-    gAFOmU4Z17HxklEGte2OHddCAhiipAriq4kZ8LtPZnaLIC0M45m97qDD70RhfSRf
-    hJu99QtnV3e3kplips5/8rtnzVMq7Ccwk/NCvYJeJM2QeSytsH3/Dkr2Bw99TKPI
-    DQIDAQAB
-    -----END PUBLIC KEY-----';
+    $key = Config::get('sso.key');
+    $encrypt = new \Illuminate\Encryption\Encrypter($key, 'AES-256-CBC');
+    $decrypted = $encrypt->decrypt($token);
 
-    $publicKey = trim($publicKey);
-    $publicKey = preg_replace('/\s*-----BEGIN PUBLIC KEY-----\s*/', '-----BEGIN PUBLIC KEY-----', $publicKey);
-    $publicKey = preg_replace('/\s*-----END PUBLIC KEY-----\s*/', '-----END PUBLIC KEY-----', $publicKey);
-
-    openssl_public_decrypt($token, $decrypted, $publicKey);
     if (isset($decrypted) && $this->destroySessionId($decrypted)) {
       return true;
     }
