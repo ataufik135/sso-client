@@ -36,7 +36,6 @@ class OAuthClient
 
   public function storeUser($data)
   {
-    Session::setId($data['sessionId']);
     Session::put('user', $data);
   }
 
@@ -156,15 +155,28 @@ class OAuthClient
     $encrypt = new \Illuminate\Encryption\Encrypter($key, 'AES-256-CBC');
     $decrypted = $encrypt->decrypt($token);
 
-    if (isset($decrypted) && $this->destroySessionId($decrypted)) {
+    if (isset($decrypted) && $this->destroySessionById($decrypted)) {
       return true;
     }
     return false;
   }
 
-  private function destroySessionId($id)
+  private function destroySessionById($id)
   {
-    Session::getHandler()->destroy($id);
+    $sessionPath = storage_path('framework' . DIRECTORY_SEPARATOR . 'sessions');
+    $sessionFiles = scandir($sessionPath);
+
+    foreach ($sessionFiles as $file) {
+      if ($file !== '.' && $file !== '..') {
+        $sessionData = file_get_contents($sessionPath . DIRECTORY_SEPARATOR . $file);
+
+        if (strpos($sessionData, $id) !== false) {
+          $sessionId = pathinfo($file, PATHINFO_FILENAME);
+          Session::getHandler()->destroy($sessionId);
+        }
+      }
+    }
+
     return true;
   }
 

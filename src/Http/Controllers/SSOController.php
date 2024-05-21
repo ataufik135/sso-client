@@ -47,14 +47,15 @@ class SSOController
       $requestToken = $this->oauthClient->requestToken($request->code, $codeVerifier);
       $this->oauthClient->storeToken($requestToken);
 
-      if ($this->oauthClient->isTokenDuplicate()) {
-        $this->logout($request);
-        return response()->json(['message' => 'Duplicate token detected.'], 403);
+      $isTokenDuplicate = $this->oauthClient->isTokenDuplicate();
+      if ($isTokenDuplicate === true) {
+        return $this->logout($request);
       }
 
       $getUser = $this->oauthClient->getUserInfo();
       $this->oauthClient->storeUser($getUser);
 
+      $request->session()->regenerate();
       return redirect(RouteServiceProvider::HOME);
     } catch (\Exception $e) {
       return response()->json(['message' => 'Unauthorized'], 403);
