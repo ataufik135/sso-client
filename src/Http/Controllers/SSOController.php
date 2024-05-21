@@ -10,72 +10,62 @@ use TaufikT\SsoClient\OAuthClient;
 class SSOController
 {
   protected $oauthClient;
-  protected $logoutUri;
 
   public function __construct(OAuthClient $oauthClient)
   {
     $this->oauthClient = $oauthClient;
-    $this->logoutUri = env('SSO_HOST_LOGOUT');
   }
 
   public function redirect(Request $request)
   {
-    if (empty(env('SSO_CLIENT_ID')) || empty(env('SSO_CLIENT_SECRET')) || empty(env('SSO_CLIENT_CALLBACK')) || empty(env('SSO_CLIENT_ORIGIN')) || empty(env('SSO_HOST')) || empty(env('SSO_HOST_LOGOUT'))) {
-      return 'Please fill SSO fields in env file';
-    }
-
     $request->session()->put('state', $state = Str::random(40));
+    $request->session()->put('code_verifier', $code_verifier = Str::random(128));
+    $codeChallenge = strtr(rtrim(base64_encode(hash('sha256', $code_verifier, true)), '='), '+/', '-_');
+
     $query = http_build_query([
-      'client_id' => env('SSO_CLIENT_ID'),
-      'redirect_uri' => env('SSO_CLIENT_CALLBACK'),
       'response_type' => 'code',
-      'scope' => env('SSO_SCOPES'),
+      'client_id' => $this->oauthClient->clientId(),
+      'redirect_uri' => $this->oauthClient->redirectUri(),
+      'scope' => $this->oauthClient->scopes(),
       'state' => $state,
+      'code_challenge' => $codeChallenge,
+      'code_challenge_method' => 'S256',
     ]);
 
-    return redirect(env('SSO_HOST') . '/oauth/authorize?' . $query);
+    return redirect($this->oauthClient->host() . '/oauth/authorize?' . $query);
   }
   public function callback(Request $request)
   {
     $state = $request->session()->pull('state');
+    $codeVerifier = $request->session()->pull('code_verifier');
 
     if (strlen($state) < 1 && $state !== $request->state) {
       return response()->json(['message' => 'Invalid state value.'], 400);
     }
 
     try {
-      $requestToken = $this->oauthClient->requestToken($request->code);
+      $requestToken = $this->oauthClient->requestToken($request->code, $codeVerifier);
       $this->oauthClient->storeToken($requestToken);
+
+      if ($this->oauthClient->isTokenDuplicate()) {
+        $this->logout($request);
+        return response()->json(['message' => 'Duplicate token detected.'], 403);
+      }
+
+      $getUser = $this->oauthClient->getUserInfo();
+      $this->oauthClient->storeUser($getUser);
+
+      return redirect(RouteServiceProvider::HOME);
     } catch (\Exception $e) {
       return response()->json(['message' => 'Unauthorized'], 403);
     }
-
-    try {
-      if ($this->oauthClient->isTokenDuplicate()) {
-        $this->oauthClient->reset();
-        return redirect($this->logoutUri);
-      }
-    } catch (\Exception $e) {
-      //
-    }
-
-    try {
-      $getUser = $this->oauthClient->getUserInfo();
-      $this->oauthClient->storeUser($getUser);
-    } catch (\Exception $e) {
-      $this->oauthClient->reset();
-      return redirect($this->logoutUri);
-    }
-
-    $request->session()->regenerate();
-    return redirect(RouteServiceProvider::HOME);
   }
 
   public function logout(Request $request)
   {
     $request->session()->invalidate();
     $request->session()->regenerateToken();
-    return redirect($this->logoutUri);
+    return redirect($this->oauthClient->logoutUri());
   }
 
   public function handleLogoutNotification(Request $request)

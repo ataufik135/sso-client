@@ -2,119 +2,106 @@
 
 namespace TaufikT\SsoClient;
 
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 
 class OAuthClient
 {
-  private $host;
-  private $clientId;
-  private $clientSecret;
-  private $redirectUri;
+  protected $host;
+  protected $logoutUri;
+  protected $clientId;
+  protected $clientSecret;
+  protected $redirectUri;
+  protected $clientOrigin;
+  protected $scopes;
 
   public function __construct()
   {
-    $this->host = env('SSO_HOST');
-    $this->clientId = env('SSO_CLIENT_ID');
-    $this->clientSecret = env('SSO_CLIENT_SECRET');
-    $this->redirectUri = env('SSO_CLIENT_CALLBACK');
-  }
-
-  public function reset()
-  {
-    session()->invalidate();
-    session()->regenerateToken();
+    $this->host = Config::get('sso.host');
+    $this->logoutUri = Config::get('sso.host_logout');
+    $this->clientId = Config::get('sso.client_id');
+    $this->clientSecret = Config::get(('sso.client_secret'));
+    $this->redirectUri = Config::get('sso.client_callback');
+    $this->clientOrigin = Config::get('sso.client_origin');
+    $this->scopes = Config::get('sso.scopes');
   }
 
   public function storeToken($data)
   {
-    session(['auth_at' => \Carbon\Carbon::now()->toIso8601String()]);
-    session()->put($data);
+    Session::put(['auth_at' => Carbon::now()->toIso8601String()]);
+    Session::put($data);
   }
 
   public function storeUser($data)
   {
-    session()->put('user', $data);
+    Session::setId($data['sessionId']);
+    Session::put('user', $data);
   }
 
-  public function requestToken($code)
+  public function requestToken($code, $codeVerifier)
   {
-    try {
-      $response = Http::withoutVerifying()->acceptJson()->asForm()->post(
-        $this->host . '/oauth/token',
-        [
-          'grant_type' => 'authorization_code',
-          'client_id' => $this->clientId,
-          'client_secret' => $this->clientSecret,
-          'redirect_uri' => $this->redirectUri,
-          'code' => $code
-        ]
-      );
+    $response = Http::withoutVerifying()->acceptJson()->asForm()->post(
+      $this->host . '/oauth/token',
+      [
+        'grant_type' => 'authorization_code',
+        'client_id' => $this->clientId,
+        'client_secret' => $this->clientSecret,
+        'redirect_uri' => $this->redirectUri,
+        'code_verifier' => $codeVerifier,
+        'code' => $code
+      ]
+    );
 
-      return $response->json();
-    } catch (\Exception $e) {
-      //
-    }
+    return $response->json();
   }
 
   public function refreshToken()
   {
-    $refresh_token = session()->get('refresh_token');
+    $refresh_token = Session::get('refresh_token');
     if (!$refresh_token) {
-      $this->reset();
+      return redirect($this->clientOrigin);
     }
 
-    try {
-      $response = Http::withoutVerifying()->acceptJson()->asForm()->post(
-        $this->host . '/oauth/token',
-        [
-          'grant_type' => 'refresh_token',
-          'refresh_token' => $refresh_token,
-          'client_id' => $this->clientId,
-          'client_secret' => $this->clientSecret,
-          'scope' => env('SSO_SCOPES'),
-        ]
-      );
+    $response = Http::withoutVerifying()->acceptJson()->asForm()->post(
+      $this->host . '/oauth/token',
+      [
+        'grant_type' => 'refresh_token',
+        'refresh_token' => $refresh_token,
+        'client_id' => $this->clientId,
+        'client_secret' => $this->clientSecret,
+        'scope' => $this->scopes,
+      ]
+    );
 
-      return $response->json();
-    } catch (\Exception $e) {
-      //
-    }
+    return $response->json();
   }
 
   public function isTokenExpired()
   {
-    $access_token = session()->get('access_token');
-    if (!$access_token) {
-      $this->reset();
-    }
-
-    $authAt = session()->get('auth_at');
-    $expiresIn = session()->get('expires_in');
+    $authAt = Session::get('auth_at');
+    $expiresIn = Session::get('expires_in');
 
     if ($authAt === null || $expiresIn === null) {
       return true;
     }
 
-    return \Carbon\Carbon::now()->gte(\Carbon\Carbon::parse($authAt)->addSeconds($expiresIn));
+    return Carbon::now()->gte(Carbon::parse($authAt)->addSeconds($expiresIn));
   }
 
   public function isTokenDuplicate()
   {
-    $access_token = session()->get('access_token');
+    $access_token = Session::get('access_token');
     if (!$access_token) {
-      $this->reset();
+      return redirect($this->clientOrigin);
     }
 
-    try {
-      $response = Http::withoutVerifying()->acceptJson()->withHeaders([
-        'Authorization' => 'Bearer ' . $access_token
-      ])->get($this->host . '/api/tokens');
+    $response = Http::withoutVerifying()->acceptJson()->withHeaders([
+      'Authorization' => 'Bearer ' . $access_token
+    ])->get($this->host . '/api/tokens');
 
-      $tokens = $response->json();
-    } catch (\Exception $e) {
-      $this->reset();
-    }
+    $tokens = $response->json();
 
     $groupedData = collect($tokens)->groupBy('client_id');
     $duplicates = $groupedData->filter(function ($items) {
@@ -126,47 +113,38 @@ class OAuthClient
 
   public function getUserInfo()
   {
-    $access_token = session()->get('access_token');
+    $access_token = Session::get('access_token');
     if (!$access_token) {
-      $this->reset();
+      return redirect($this->clientOrigin);
     }
 
-    try {
-      $response = Http::withoutVerifying()->acceptJson()->withHeaders([
-        'Authorization' => 'Bearer ' . $access_token
-      ])->get($this->host . '/api/user');
+    $response = Http::withoutVerifying()->acceptJson()->withHeaders([
+      'Authorization' => 'Bearer ' . $access_token
+    ])->get($this->host . '/api/user');
 
-      return $response->json();
-    } catch (\Exception $e) {
-      $this->reset();
-    }
+    return $response->json();
   }
 
   public function validateToken()
   {
-    $access_token = session()->get('access_token');
-    if (!$access_token) {
-      $this->reset();
-    }
-
-    if ($this->isTokenExpired()) {
-      if ($refreshToken = $this->refreshToken()) {
-        $this->storeToken($refreshToken);
-      }
-    }
-
-    if ($getUser = $this->getUserInfo()) {
-      $user = session()->get('user');
-      if ($user['sessionId'] !== $getUser['sessionId']) {
-        $this->reset();
-      }
-
-      session()->forget('user');
-      $this->storeUser($getUser);
-
+    if (!$this->isTokenExpired()) {
       return true;
     }
 
+    if ($refreshToken = $this->refreshToken()) {
+      $this->storeToken($refreshToken);
+    }
+
+    if ($getUser = $this->getUserInfo()) {
+      $user = Session::get('user');
+      if ($user['sessionId'] !== $getUser['sessionId']) {
+        return redirect($this->logoutUri);
+      }
+
+      Session::forget('user');
+      $this->storeUser($getUser);
+      return true;
+    }
     return false;
   }
 
@@ -174,34 +152,55 @@ class OAuthClient
   {
     $token = base64_decode($token);
 
-    $key = 'tPhW82l0s2mV8f?_(ZAz[&Aq_a1&_3}S';
+    $publicKey = '-----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2lwcy6IOYhaz4bwOn3f5
+    8HKlF/xwxem5mdBSlWiibmpDYFj8GtHG44s8HQW9/x5E6YwbgRzureeaPeiEHEpb
+    uk18ywsEGrCVGqWFZBHRV/Q1N7Wqg9O4n1hISueGdc8Pu3kNAQn/4FcXnFODzvJY
+    v99CFDDUlUbGCc8k8IYr9gzTktUKfLIAPR1dA7lUruN5b/2opsgvmCnNAhVE2vSV
+    gAFOmU4Z17HxklEGte2OHddCAhiipAriq4kZ8LtPZnaLIC0M45m97qDD70RhfSRf
+    hJu99QtnV3e3kplips5/8rtnzVMq7Ccwk/NCvYJeJM2QeSytsH3/Dkr2Bw99TKPI
+    DQIDAQAB
+    -----END PUBLIC KEY-----';
 
-    $secret = new \Illuminate\Encryption\Encrypter($key, 'AES-256-CBC');
-    $decrypt = $secret->decrypt($token);
-
-    if (isset($decrypt) && $this->destroySessionById($decrypt)) {
+    openssl_public_decrypt($token, $decrypted, $publicKey);
+    if (isset($decrypted) && $this->destroySessionId($decrypted)) {
       return true;
-    } else {
-      return false;
     }
+    return false;
   }
 
-  private function destroySessionById($id)
+  private function destroySessionId($id)
   {
-    $sessionPath = storage_path('framework' . DIRECTORY_SEPARATOR . 'sessions');
-    $sessionFiles = scandir($sessionPath);
-
-    foreach ($sessionFiles as $file) {
-      if ($file !== '.' && $file !== '..') {
-        $sessionData = file_get_contents($sessionPath . DIRECTORY_SEPARATOR . $file);
-
-        if (strpos($sessionData, $id) !== false) {
-          $sessionId = pathinfo($file, PATHINFO_FILENAME);
-          Session::getHandler()->destroy($sessionId);
-        }
-      }
-    }
-
+    Session::getHandler()->destroy($id);
     return true;
+  }
+
+  public function host()
+  {
+    return $this->host;
+  }
+  public function logoutUri()
+  {
+    return $this->logoutUri;
+  }
+  public function clientId()
+  {
+    return $this->clientId;
+  }
+  public function clientSecret()
+  {
+    return $this->clientSecret;
+  }
+  public function redirectUri()
+  {
+    return $this->redirectUri;
+  }
+  public function clientOrigin()
+  {
+    return $this->clientOrigin;
+  }
+  public function scopes()
+  {
+    return $this->scopes;
   }
 }

@@ -10,14 +10,10 @@ use TaufikT\SsoClient\OAuthClient;
 class Authenticate
 {
   protected $oauthClient;
-  protected $logoutUri;
-  protected $applicationId;
 
   public function __construct(OAuthClient $oauthClient)
   {
     $this->oauthClient = $oauthClient;
-    $this->logoutUri = env('SSO_HOST_LOGOUT');
-    $this->applicationId = env('SSO_CLIENT_ID');
   }
 
   /**
@@ -27,8 +23,8 @@ class Authenticate
    */
   public function handle(Request $request, Closure $next): Response
   {
-    $access_token = session()->get('access_token');
-    $user = session()->get('user');
+    $access_token = $request->session()->get('access_token');
+    $user = $request->session()->get('user');
 
     if (!$access_token || !$user) {
       return redirect(route('oauth2.redirect'));
@@ -47,8 +43,7 @@ class Authenticate
     if ($refreshToken = $this->oauthClient->refreshToken()) {
       $this->oauthClient->storeToken($refreshToken);
       if ($this->oauthClient->isTokenDuplicate()) {
-        $this->oauthClient->reset();
-        return redirect($this->logoutUri);
+        return redirect($this->oauthClient->logoutUri());
       }
       return $next($request);
     }
@@ -59,7 +54,7 @@ class Authenticate
   private function isUserAuthorized($user)
   {
     foreach ($user['registrations'] as $registration) {
-      if ($registration['applicationId'] === $this->applicationId) {
+      if ($registration['applicationId'] === $this->oauthClient->clientId()) {
         return $this->isUserValid();
       }
     }

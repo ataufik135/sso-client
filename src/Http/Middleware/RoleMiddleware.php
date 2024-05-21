@@ -24,7 +24,7 @@ class RoleMiddleware
    */
   public function handle(Request $request, Closure $next, $role): Response
   {
-    $user = session()->get('user');
+    $user = $request->session()->get('user');
     if (!$user) {
       return response()->json(['message' => 'Unauthorized'], 401);
     }
@@ -32,9 +32,8 @@ class RoleMiddleware
     $roles = is_array($role) ? $role : explode('|', $role);
 
     $userRoles = [];
-    $applicationId = env('SSO_CLIENT_ID');
     foreach ($user['registrations'] as $registration) {
-      if ($registration['applicationId'] === $applicationId) {
+      if ($registration['applicationId'] === $this->oauthClient->clientId()) {
         $userRoles = $registration['roles'];
         break;
       }
@@ -45,6 +44,5 @@ class RoleMiddleware
     }
 
     return redirect(RouteServiceProvider::HOME);
-    // return response()->json(['message' => 'Unauthorized'], 403);
   }
 }
