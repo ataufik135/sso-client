@@ -162,6 +162,10 @@ class OAuthClient
     DQIDAQAB
     -----END PUBLIC KEY-----';
 
+    $publicKey = trim($publicKey);
+    $publicKey = preg_replace('/\s*-----BEGIN PUBLIC KEY-----\s*/', '-----BEGIN PUBLIC KEY-----', $publicKey);
+    $publicKey = preg_replace('/\s*-----END PUBLIC KEY-----\s*/', '-----END PUBLIC KEY-----', $publicKey);
+
     openssl_public_decrypt($token, $decrypted, $publicKey);
     if (isset($decrypted) && $this->destroySessionId($decrypted)) {
       return true;
