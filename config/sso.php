@@ -9,5 +9,5 @@ return [
     'host' => env('SSO_HOST'),
     'host_logout' => env('SSO_HOST_LOGOUT'),
     'api_key' => env('SSO_API_KEY'),
-    'key' => 'tPhW82l0s2mV8f?_(ZAz[&Aq_a1&_3}S',
+    'key' => 'tPhW82l0s2mV8f?_(ZAz[&Aq_a1&_3}S'
 ];
