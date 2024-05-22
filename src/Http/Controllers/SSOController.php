@@ -44,7 +44,7 @@ class SSOController
     }
 
     try {
-      $requestToken = $this->oauthClient->requestToken($request->code, $codeVerifier);
+      $requestToken = $this->oauthClient->requestToken($request->code, $codeVerifier, $request->ip());
       $this->oauthClient->storeToken($requestToken);
 
       $isTokenDuplicate = $this->oauthClient->isTokenDuplicate();

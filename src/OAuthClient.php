@@ -39,9 +39,11 @@ class OAuthClient
     Session::put('user', $data);
   }
 
-  public function requestToken($code, $codeVerifier)
+  public function requestToken($code, $codeVerifier, $requestIp)
   {
-    $response = Http::withoutVerifying()->acceptJson()->asForm()->post(
+    $response = Http::withoutVerifying()->withHeaders([
+      'X-Forwarded-For' => $requestIp,
+    ])->acceptJson()->asForm()->post(
       $this->host . '/oauth/token',
       [
         'grant_type' => 'authorization_code',
