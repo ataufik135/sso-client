@@ -18,6 +18,7 @@ class SSOController
 
   public function redirect(Request $request)
   {
+    $request->session()->put('request_ip', $request->ip());
     $request->session()->put('state', $state = Str::random(40));
     $request->session()->put('code_verifier', $code_verifier = Str::random(128));
     $codeChallenge = strtr(rtrim(base64_encode(hash('sha256', $code_verifier, true)), '='), '+/', '-_');
@@ -36,6 +37,7 @@ class SSOController
   }
   public function callback(Request $request)
   {
+    $requestIp = $request->session()->pull('request_ip');
     $state = $request->session()->pull('state');
     $codeVerifier = $request->session()->pull('code_verifier');
 
@@ -44,7 +46,7 @@ class SSOController
     }
 
     try {
-      $requestToken = $this->oauthClient->requestToken($request->code, $codeVerifier, $request->ip());
+      $requestToken = $this->oauthClient->requestToken($request->code, $codeVerifier, $requestIp);
       $this->oauthClient->storeToken($requestToken);
 
       $isTokenDuplicate = $this->oauthClient->isTokenDuplicate();
