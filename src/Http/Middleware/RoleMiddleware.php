@@ -26,7 +26,7 @@ class RoleMiddleware
   {
     $user = $request->session()->get('user');
     if (!$user) {
-      return response()->json(['message' => 'Unauthorized'], 401);
+      abort(403);
     }
 
     $roles = is_array($role) ? $role : explode('|', $role);
