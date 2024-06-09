@@ -4,10 +4,11 @@ namespace TaufikT\SsoClient\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 use TaufikT\SsoClient\OAuthClient;
 
-class Authenticate
+class UserActivity
 {
   protected $oauthClient;
 
@@ -24,38 +25,28 @@ class Authenticate
   public function handle(Request $request, Closure $next): Response
   {
     $user = $request->session()->get('user');
-    $status = $request->session()->get('status');
+    if ($user && $this->isUserAuthenticated($user['id'])) {
+      $expiresAt = now()->addMinutes(2);
+      Cache::put('user-is-online-' . $user['id'], true, $expiresAt);
 
-    if ($status === 403) {
-      abort(403);
+      if (!Cache::has('online-users')) {
+        $userIds = $this->oauthClient->getAllUserIdAuthUser();
+        $onlineUsers = [];
+        foreach ($userIds as $userId) {
+          if (Cache::has('user-is-online-' . $userId)) {
+            $onlineUsers[] = $userId;
+          }
+        }
+
+        $this->oauthClient->updateOnlineUsers($onlineUsers);
+        Cache::put('online-users', true, $expiresAt);
+      }
     }
-
-    if (!$user || !$this->isUserAuthenticated($user['id'])) {
-      return redirect()->route('oauth2.redirect');
-    }
-
-    if (!$this->isUserAuthorized($user['applicationId'])) {
-      abort(403);
-    }
-
     return $next($request);
   }
 
-  private function isUserAuthorized($applicationId)
-  {
-    if ($applicationId === $this->oauthClient->clientId()) {
-      return $this->isUserValid();
-    }
-
-    return false;
-  }
   private function isUserAuthenticated($userId)
   {
     return $this->oauthClient->checkAuthUser($userId);
-  }
-
-  protected function isUserValid()
-  {
-    return true;
   }
 }

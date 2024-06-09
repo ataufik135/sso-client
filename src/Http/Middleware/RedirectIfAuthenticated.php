@@ -24,26 +24,17 @@ class RedirectIfAuthenticated
    */
   public function handle(Request $request, Closure $next): Response
   {
-    $access_token = $request->session()->get('access_token');
     $user = $request->session()->get('user');
 
-    if (!$access_token || !$user) {
+    if (!$user || !$this->isUserAuthenticated($user['id'])) {
       return $next($request);
     }
 
-    $isTokenExpired = $this->oauthClient->isTokenExpired();
-    if (!$isTokenExpired) {
-      return redirect(RouteServiceProvider::HOME);
-    }
+    return redirect(RouteServiceProvider::HOME);
+  }
 
-    if ($refreshToken = $this->oauthClient->refreshToken()) {
-      $this->oauthClient->storeToken($refreshToken);
-      if ($this->oauthClient->isTokenDuplicate()) {
-        return redirect($this->oauthClient->logoutUri());
-      }
-      return redirect(RouteServiceProvider::HOME);
-    }
-
-    return $next($request);
+  private function isUserAuthenticated($userId)
+  {
+    return $this->oauthClient->checkAuthUser($userId);
   }
 }

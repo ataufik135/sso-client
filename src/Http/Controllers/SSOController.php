@@ -18,6 +18,7 @@ class SSOController
 
   public function redirect(Request $request)
   {
+    $request->session()->put('request_url', $request->session()->get('_previous.url'));
     $request->session()->put('request_ip', $request->ip());
     $request->session()->put('state', $state = Str::random(40));
     $request->session()->put('code_verifier', $code_verifier = Str::random(128));
@@ -37,6 +38,7 @@ class SSOController
   }
   public function callback(Request $request)
   {
+    $requestUrl = $request->session()->pull('request_url');
     $requestIp = $request->session()->pull('request_ip');
     $state = $request->session()->pull('state');
     $codeVerifier = $request->session()->pull('code_verifier');
@@ -46,21 +48,14 @@ class SSOController
     }
 
     try {
-      $requestToken = $this->oauthClient->requestToken($request->code, $codeVerifier, $requestIp);
-      $this->oauthClient->storeToken($requestToken);
-
-      $isTokenDuplicate = $this->oauthClient->isTokenDuplicate();
-      if ($isTokenDuplicate === true) {
-        return $this->logout($request);
-      }
-
-      $getUser = $this->oauthClient->getUserInfo();
-      $this->oauthClient->storeUser($getUser);
+      $this->oauthClient->requestToken($request->code, $codeVerifier, $requestIp);
+      $user = $request->session()->get('user');
 
       $request->session()->regenerate();
-      return redirect(RouteServiceProvider::HOME);
+      $this->oauthClient->addAuthUser($user['id'], $user['sessionId']);
+      return $requestUrl !== null ? $requestUrl : redirect()->intended('/');
     } catch (\Exception $e) {
-      return response()->json(['message' => 'Unauthorized'], 403);
+      return response()->json(['message' => 'Unauthorized.'], 403);
     }
   }
 
@@ -75,13 +70,10 @@ class SSOController
   {
     $token = $request->header('Authorization');
     if (!$token) {
-      return response()->json(['message' => 'Unauthorized'], 403);
+      return response()->json(['message' => 'Unauthorized.'], 403);
     }
 
-    if ($this->oauthClient->logout($token)) {
-      return response()->json(['message' => 'You have been successfully logged out'], 200);
-    } else {
-      return response()->json(['message' => 'Unauthorized'], 403);
-    }
+    $this->oauthClient->logout($token);
+    return response()->json(['message' => 'You have been logged out!'], 200);
   }
 }

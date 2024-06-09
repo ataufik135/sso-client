@@ -5,8 +5,8 @@ namespace TaufikT\SsoClient\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use TaufikT\SsoClient\OAuthClient;
 use App\Providers\RouteServiceProvider;
+use TaufikT\SsoClient\OAuthClient;
 
 class RoleMiddleware
 {
@@ -31,15 +31,7 @@ class RoleMiddleware
 
     $roles = is_array($role) ? $role : explode('|', $role);
 
-    $userRoles = [];
-    foreach ($user['registrations'] as $registration) {
-      if ($registration['applicationId'] === $this->oauthClient->clientId()) {
-        $userRoles = $registration['roles'];
-        break;
-      }
-    }
-
-    if (count(array_intersect($roles, $userRoles)) > 0) {
+    if (count(array_intersect($roles, $user['roles'])) > 0) {
       return $next($request);
     }
 

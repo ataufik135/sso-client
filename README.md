@@ -10,11 +10,11 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
 
     SSO_CLIENT_ID="9a490422-0cdb-48bb-8ea4-c816786089f4"
     SSO_CLIENT_SECRET="VNj0KAWJp2IfSlk2c7L67jdrPPhc0apMZVgDiSxs"
-    SSO_CLIENT_CALLBACK="http://app.client.com/oauth2/callback"
-    SSO_CLIENT_ORIGIN="http://app.client.com"
+    SSO_CLIENT_CALLBACK="https://app.client.com/oauth2/callback"
+    SSO_CLIENT_ORIGIN="https://app.client.com"
     SSO_SCOPES=""
-    SSO_HOST="http://sso.server.com"
-    SSO_HOST_LOGOUT="http://sso.server.com/logout"
+    SSO_HOST="https://sso.server.com"
+    SSO_HOST_LOGOUT="https://sso.server.com/logout"
 
 ##### Publish config
 
@@ -23,11 +23,22 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
 ##### config/app.php
 
     'providers' => ServiceProvider::defaultProviders()->merge([
+        /*
+         * Package Service Providers...
+         */
         // ...
         TaufikT\SsoClient\SSOServiceProvider::class,
     ])->toArray(),
 
 ##### app/Http/Kernel.php
+
+    protected $middlewareGroups = [
+        'web' => [
+        // ...
+            \App\Http\Middleware\UserActivity::class,
+        ],
+        // ...
+    ];
 
     protected $middlewareAliases = [
         // ...
@@ -49,6 +60,9 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
     });
     Route::group(['middleware' => ['sso.role:user|admin|manager']], function () {
         // users with specified roles only
+    });
+    Route::group(['middleware' => ['sso.auth', 'sso.role:user|admin|manager']], function () {
+        // authenticated users with specified roles only
     });
 
 ### Middleware with Controllers

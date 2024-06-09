@@ -3,9 +3,12 @@
 namespace TaufikT\SsoClient;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
+use GuzzleHttp\Client;
+use GuzzleHttp\Promise;
 
 class OAuthClient
 {
@@ -28,23 +31,68 @@ class OAuthClient
     $this->scopes = Config::get('sso.scopes');
   }
 
+  public function addAuthUser($userId, $sessionId)
+  {
+    $users = Cache::get('authenticated-users');
+
+    $users[$userId] = ['sessionId' => $sessionId];
+    Cache::forever('authenticated-users', $users);
+  }
+  public function removeAuthUser($userId)
+  {
+    $users = cache::get('authenticated-users');
+    unset($users[$userId]);
+    Cache::forever('authenticated-users', $users);
+  }
+  public function countAuthUser()
+  {
+    $users = cache::get('authenticated-users');
+    return count($users);
+  }
+  public function getSessionIdAuthUser($userId)
+  {
+    $sessionId = cache::get('authenticated-users')[$userId]['sessionId'];
+    return $sessionId;
+  }
+  public function getAllUserIdAuthUser()
+  {
+    return array_keys(cache::get('authenticated-users'));
+  }
+  public function checkAuthUser($userId)
+  {
+    return isset(Cache::get('authenticated-users')[$userId]);
+  }
+  public function updateOnlineUsers($data)
+  {
+    $httpClient = new Client([
+      'http_errors' => false,
+      'verify' => false
+    ]);
+    $promises = $httpClient->postAsync(
+      $this->host . '/api/online-users',
+      [
+        'headers' => [
+          'Accept' => 'application/json',
+          'client-id' => $this->clientId
+        ],
+        'form_params' => ['online_users' => $data]
+      ]
+
+    );
+
+    Promise\Utils::settle($promises)->wait();
+  }
+
   public function storeToken($data)
   {
-    Session::put(['auth_at' => Carbon::now()->toIso8601String()]);
     Session::put($data);
   }
-
-  public function storeUser($data)
-  {
-    Session::put('user', $data);
-  }
-
   public function requestToken($code, $codeVerifier, $requestIp)
   {
     $response = Http::withoutVerifying()->withHeaders([
       'X-Forwarded-For' => $requestIp,
     ])->acceptJson()->asForm()->post(
-      $this->host . '/oauth/token',
+      $this->host . '/api/oauth/token',
       [
         'grant_type' => 'authorization_code',
         'client_id' => $this->clientId,
@@ -55,7 +103,14 @@ class OAuthClient
       ]
     );
 
-    return $response->json();
+    if ($response->status() === 409) {
+      return redirect($this->logoutUri);
+    }
+
+    $this->storeToken($response->json());
+    if ($response->status() === 403) {
+      abort(403);
+    }
   }
 
   public function refreshToken()
@@ -66,7 +121,7 @@ class OAuthClient
     }
 
     $response = Http::withoutVerifying()->acceptJson()->asForm()->post(
-      $this->host . '/oauth/token',
+      $this->host . '/api/oauth/token',
       [
         'grant_type' => 'refresh_token',
         'refresh_token' => $refresh_token,
@@ -79,76 +134,6 @@ class OAuthClient
     return $response->json();
   }
 
-  public function isTokenExpired()
-  {
-    $authAt = Session::get('auth_at');
-    $expiresIn = Session::get('expires_in');
-
-    if ($authAt === null || $expiresIn === null) {
-      return true;
-    }
-
-    return Carbon::now()->gte(Carbon::parse($authAt)->addSeconds($expiresIn));
-  }
-
-  public function isTokenDuplicate()
-  {
-    $access_token = Session::get('access_token');
-    if (!$access_token) {
-      return redirect($this->clientOrigin);
-    }
-
-    $response = Http::withoutVerifying()->acceptJson()->withHeaders([
-      'Authorization' => 'Bearer ' . $access_token
-    ])->get($this->host . '/api/tokens');
-
-    $tokens = $response->json();
-
-    $groupedData = collect($tokens)->groupBy('client_id');
-    $duplicates = $groupedData->filter(function ($items) {
-      return $items->count() > 1;
-    });
-
-    return $duplicates->isNotEmpty() ? true : false;
-  }
-
-  public function getUserInfo()
-  {
-    $access_token = Session::get('access_token');
-    if (!$access_token) {
-      return redirect($this->clientOrigin);
-    }
-
-    $response = Http::withoutVerifying()->acceptJson()->withHeaders([
-      'Authorization' => 'Bearer ' . $access_token
-    ])->get($this->host . '/api/user');
-
-    return $response->json();
-  }
-
-  public function validateToken()
-  {
-    if (!$this->isTokenExpired()) {
-      return true;
-    }
-
-    if ($refreshToken = $this->refreshToken()) {
-      $this->storeToken($refreshToken);
-    }
-
-    if ($getUser = $this->getUserInfo()) {
-      $user = Session::get('user');
-      if ($user['sessionId'] !== $getUser['sessionId']) {
-        return redirect($this->logoutUri);
-      }
-
-      Session::forget('user');
-      $this->storeUser($getUser);
-      return true;
-    }
-    return false;
-  }
-
   public function logout($token)
   {
     $token = base64_decode($token);
@@ -157,29 +142,14 @@ class OAuthClient
     $encrypt = new \Illuminate\Encryption\Encrypter($key, 'AES-256-CBC');
     $decrypted = $encrypt->decrypt($token);
 
-    if (isset($decrypted) && $this->destroySessionById($decrypted)) {
-      return true;
-    }
-    return false;
+    $this->destroySessionById($decrypted);
   }
 
-  private function destroySessionById($id)
+  private function destroySessionById($userId)
   {
-    $sessionPath = storage_path('framework' . DIRECTORY_SEPARATOR . 'sessions');
-    $sessionFiles = scandir($sessionPath);
-
-    foreach ($sessionFiles as $file) {
-      if ($file !== '.' && $file !== '..') {
-        $sessionData = file_get_contents($sessionPath . DIRECTORY_SEPARATOR . $file);
-
-        if (strpos($sessionData, $id) !== false) {
-          $sessionId = pathinfo($file, PATHINFO_FILENAME);
-          Session::getHandler()->destroy($sessionId);
-        }
-      }
-    }
-
-    return true;
+    $sessionId = $this->getSessionIdAuthUser($userId);
+    $this->removeAuthUser($userId);
+    Session::getHandler()->destroy($sessionId);
   }
 
   public function host()
