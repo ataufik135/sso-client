@@ -53,7 +53,7 @@ class SSOController
 
       $request->session()->regenerate();
       $this->oauthClient->addAuthUser($user['id'], $user['sessionId']);
-      return $requestUrl !== null ? $requestUrl : redirect()->intended('/');
+      return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
     } catch (\Exception $e) {
       return response()->json(['message' => 'Unauthorized.'], 403);
     }
