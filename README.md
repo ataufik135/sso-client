@@ -35,7 +35,7 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
     protected $middlewareGroups = [
         'web' => [
         // ...
-            \App\Http\Middleware\UserActivity::class,
+            \TaufikT\SsoClient\Http\Middleware\UserActivity::class,
         ],
         // ...
     ];
