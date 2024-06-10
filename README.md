@@ -18,7 +18,7 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
 
 ##### Publish config
 
-    php artisan vendor:publish --provider="TaufikT\SsoClient\SSOServiceProvider"
+    php artisan vendor:publish --provider="TaufikT\SsoClient\SSOServiceProvider" --force
 
 ##### config/app.php
 
