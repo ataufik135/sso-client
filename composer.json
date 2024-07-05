@@ -1,34 +1,39 @@
 {
-    "name": "taufik-t/sso-client",
-    "description": "A Single Sign-On (SSO) client package utilizing OAuth2",
-    "type": "library",
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Taufik",
-            "email": "ataufik135@gmail.com"
-        }
-    ],
-    "require": {
-        "php": ">=7.0.0",
-        "illuminate/session": ">=5.0",
-        "guzzlehttp/guzzle": ">=7.0"
-    },
-    "autoload": {
-        "psr-4": {
-            "TaufikT\\SsoClient\\": "src/"
-        }
-    },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "TaufikT\\SsoClient\\SSOServiceProvider"
-            ],
-            "aliases": {
-                "OAuthClient": "TaufikT\\SsoClient\\Facades\\OAuthClient"
-            }
-        }
-    },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+  "name": "taufik-t/sso-client",
+  "description": "A Single Sign-On (SSO) client package utilizing OAuth2",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Taufik",
+      "email": "ataufik135@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.0.0",
+    "illuminate/session": ">=5.0",
+    "guzzlehttp/guzzle": ">=7.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "TaufikT\\SsoClient\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "TaufikT\\SsoClient\\SSOServiceProvider"
+      ],
+      "aliases": {
+        "OAuthClient": "TaufikT\\SsoClient\\Facades\\OAuthClient"
+      }
+    }
+  },
+  "scripts": {
+    "post-autoload-dump": [
+      "@php artisan vendor:publish --tag=config --provider=\"TaufikT\\SsoClient\\SSOServiceProvider\" --force"
+    ]
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
 }

@@ -25,7 +25,9 @@ class SSOServiceProvider extends ServiceProvider
    */
   public function boot(): void
   {
-    $this->publishConfig(__DIR__ . '/../config/' . $this->configFileName);
+    $this->publishes([
+      __DIR__ . '/../config/' . $this->configFileName => $this->getConfigPath(),
+    ], 'config');
     $this->loadRoutes();
 
     Blade::directive('ssoRole', function ($role) {
@@ -41,10 +43,6 @@ class SSOServiceProvider extends ServiceProvider
   protected function getConfigPath()
   {
     return config_path($this->configFileName);
-  }
-  protected function publishConfig(string $configPath)
-  {
-    $this->publishes([$configPath => $this->getConfigPath()]);
   }
   protected function loadRoutes()
   {
