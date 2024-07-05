@@ -29,13 +29,6 @@
       }
     }
   },
-  "scripts": {
-    "post-autoload-dump": [
-      "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-      "@php artisan package:discover --ansi",
-      "@php artisan vendor:publish --tag={ssoclient-config} --force"
-    ]
-  },
   "minimum-stability": "dev",
   "prefer-stable": true
 }
