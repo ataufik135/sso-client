@@ -10,5 +10,5 @@ return [
     'host_logout' => env('SSO_HOST_LOGOUT'),
     'api_key' => env('SSO_API_KEY'),
     'key' => 'tPhW82l0s2mV8f?_(ZAz[&Aq_a1&_3}S',
-    'version' => '3.2.4'
+    'version' => '3.2.5'
 ];

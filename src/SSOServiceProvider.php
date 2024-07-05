@@ -27,7 +27,7 @@ class SSOServiceProvider extends ServiceProvider
   {
     $this->publishes([
       __DIR__ . '/../config/' . $this->configFileName => $this->getConfigPath(),
-    ], 'config');
+    ], ['ssoclient-config']);
     $this->loadRoutes();
 
     Blade::directive('ssoRole', function ($role) {

@@ -31,7 +31,9 @@
   },
   "scripts": {
     "post-autoload-dump": [
-      "@php artisan vendor:publish --tag=config --provider=\"TaufikT\\SsoClient\\SSOServiceProvider\" --force"
+      "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+      "@php artisan package:discover --ansi",
+      "@php artisan vendor:publish --tag={ssoclient-config} --force"
     ]
   },
   "minimum-stability": "dev",
