@@ -140,7 +140,7 @@ class OAuthClient
   public function logout($token)
   {
     $jwtToken = jwtDecrypt($token);
-    $this->destroySessionById(base64_decode($jwtToken['id']));
+    $this->destroySessionById(base64_decode($jwtToken->id));
   }
 
   private function destroySessionById($userId)
