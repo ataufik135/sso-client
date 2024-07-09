@@ -12,7 +12,8 @@
   "require": {
     "php": ">=7.0.0",
     "illuminate/session": ">=5.0",
-    "guzzlehttp/guzzle": ">=7.0"
+    "guzzlehttp/guzzle": ">=7.0",
+    "firebase/php-jwt": ">=6.10"
   },
   "autoload": {
     "psr-4": {

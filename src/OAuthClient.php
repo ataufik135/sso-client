@@ -32,11 +32,14 @@ class OAuthClient
     $this->version = Config::get('sso.version');
   }
 
-  public function addAuthUser($userId, $sessionId)
+  public function addAuthUser($userId, $sessionId, $clientSessionId)
   {
     $users = Cache::get('authenticated-users');
 
-    $users[$userId] = ['sessionId' => $sessionId];
+    $users[$userId] = [
+      'sessionId' => $sessionId,
+      'clientSessionId' => $clientSessionId
+    ];
     Cache::forever('authenticated-users', $users);
   }
   public function removeAuthUser($userId)
@@ -50,10 +53,10 @@ class OAuthClient
     $users = cache::get('authenticated-users');
     return count($users);
   }
-  public function getSessionIdAuthUser($userId)
+  public function getClientSessionIdAuthUser($userId)
   {
-    $sessionId = cache::get('authenticated-users')[$userId]['sessionId'];
-    return $sessionId;
+    $clientSessionId = cache::get('authenticated-users')[$userId]['clientSessionId'];
+    return $clientSessionId;
   }
   public function getAllUserIdAuthUser()
   {
@@ -136,20 +139,15 @@ class OAuthClient
 
   public function logout($token)
   {
-    $token = base64_decode($token);
-
-    $key = Config::get('sso.key');
-    $encrypt = new \Illuminate\Encryption\Encrypter($key, 'AES-256-CBC');
-    $decrypted = $encrypt->decrypt($token);
-
+    $decrypted = base64_decode(jwtDecrypt($token));
     $this->destroySessionById($decrypted);
   }
 
   private function destroySessionById($userId)
   {
-    $sessionId = $this->getSessionIdAuthUser($userId);
+    $clientSessionId = $this->getClientSessionIdAuthUser($userId);
     $this->removeAuthUser($userId);
-    Session::getHandler()->destroy($sessionId);
+    Session::getHandler()->destroy($clientSessionId);
   }
 
   public function host()

@@ -3,6 +3,7 @@
 namespace TaufikT\SsoClient\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use TaufikT\SsoClient\OAuthClient;
 
@@ -54,7 +55,8 @@ class SSOController
       $user = $request->session()->get('user');
 
       $request->session()->regenerate();
-      $this->oauthClient->addAuthUser($user['id'], $user['sessionId']);
+      $clientSessionId = Session::getId();
+      $this->oauthClient->addAuthUser($user['id'], $user['sessionId'], $clientSessionId);
       return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
     } catch (\Exception $e) {
       abort(403);
@@ -70,7 +72,7 @@ class SSOController
 
   public function handleLogoutNotification(Request $request)
   {
-    $token = $request->header('Authorization');
+    $token = $request->bearerToken();
     if (!$token) {
       return response()->json(['message' => 'Unauthorized.'], 403);
     }

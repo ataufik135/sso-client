@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Session;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 function checkSsoRole($role)
 {
@@ -15,4 +17,9 @@ function checkSsoRole($role)
     return true;
   }
   return false;
+}
+function jwtDecrypt($payload)
+{
+  $publicKey = config('sso.jwt_public_key');
+  return JWT::decode($payload, new Key($publicKey, 'RS256'));
 }
