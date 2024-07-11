@@ -44,23 +44,23 @@ class OAuthClient
   }
   public function removeAuthUser($userId)
   {
-    $users = cache::get('authenticated-users');
+    $users = Cache::get('authenticated-users');
     unset($users[$userId]);
     Cache::forever('authenticated-users', $users);
   }
   public function countAuthUser()
   {
-    $users = cache::get('authenticated-users');
+    $users = Cache::get('authenticated-users');
     return count($users);
   }
   public function getClientSessionIdAuthUser($userId)
   {
-    $clientSessionId = cache::get('authenticated-users')[$userId]['clientSessionId'];
+    $clientSessionId = Cache::get('authenticated-users')[$userId]['clientSessionId'];
     return $clientSessionId;
   }
   public function getAllUserIdAuthUser()
   {
-    return array_keys(cache::get('authenticated-users'));
+    return array_keys(Cache::get('authenticated-users'));
   }
   public function checkAuthUser($userId)
   {
