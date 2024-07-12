@@ -32,6 +32,21 @@ class OAuthClient
     $this->version = Config::get('sso.version');
   }
 
+  public function addUnauthUser($userId, $clientSessionId)
+  {
+    $users = Cache::get('unauthenticated -users');
+
+    $users[$userId] = [
+      'clientSessionId' => $clientSessionId
+    ];
+    Cache::forever('unauthenticated -users', $users);
+  }
+  public function removeUnauthUser($userId)
+  {
+    $users = Cache::get('unauthenticated-users');
+    unset($users[$userId]);
+    Cache::forever('unauthenticated-users', $users);
+  }
   public function addAuthUser($userId, $sessionId, $clientSessionId)
   {
     $users = Cache::get('authenticated-users');
@@ -53,6 +68,11 @@ class OAuthClient
     $users = Cache::get('authenticated-users');
     return count($users);
   }
+  public function getClientSessionIdUnauthUser($userId)
+  {
+    $clientSessionId = Cache::get('unauthenticated-users')[$userId]['clientSessionId'];
+    return $clientSessionId;
+  }
   public function getClientSessionIdAuthUser($userId)
   {
     $clientSessionId = Cache::get('authenticated-users')[$userId]['clientSessionId'];
@@ -61,6 +81,10 @@ class OAuthClient
   public function getAllUserIdAuthUser()
   {
     return array_keys(Cache::get('authenticated-users'));
+  }
+  public function checkUnauthUser($userId)
+  {
+    return isset(Cache::get('unauthenticated-users')[$userId]);
   }
   public function checkAuthUser($userId)
   {
@@ -145,8 +169,13 @@ class OAuthClient
 
   private function destroySessionById($userId)
   {
-    $clientSessionId = $this->getClientSessionIdAuthUser($userId);
-    $this->removeAuthUser($userId);
+    if ($this->checkAuthUser($userId)) {
+      $clientSessionId = $this->getClientSessionIdAuthUser($userId);
+      $this->removeAuthUser($userId);
+    } else {
+      $clientSessionId = $this->getClientSessionIdUnauthUser($userId);
+      $this->removeUnauthUser($userId);
+    }
     Session::getHandler()->destroy($clientSessionId);
   }
 

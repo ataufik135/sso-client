@@ -52,12 +52,19 @@ class SSOController
       if ($response->status() === 400) {
         return $response->json();
       }
-      $user = $request->session()->get('user');
+      if ($response->successful()) {
+        $user = $request->session()->get('user');
 
-      $request->session()->regenerate();
+        $request->session()->regenerate();
+        $clientSessionId = Session::getId();
+        $this->oauthClient->addAuthUser($user['id'], $user['sessionId'], $clientSessionId);
+        return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
+      }
+
+      $userId = $request->session()->get('userId');
       $clientSessionId = Session::getId();
-      $this->oauthClient->addAuthUser($user['id'], $user['sessionId'], $clientSessionId);
-      return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
+      $this->oauthClient->addUnauthUser($userId, $clientSessionId);
+      throw new \Exception('Unauthorized.');
     } catch (\Exception $e) {
       abort(403);
     }
