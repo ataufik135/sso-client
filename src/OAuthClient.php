@@ -34,12 +34,12 @@ class OAuthClient
 
   public function addUnauthUser($userId, $clientSessionId)
   {
-    $users = Cache::get('unauthenticated -users');
+    $users = Cache::get('unauthenticated-users');
 
     $users[$userId] = [
       'clientSessionId' => $clientSessionId
     ];
-    Cache::forever('unauthenticated -users', $users);
+    Cache::forever('unauthenticated-users', $users);
   }
   public function removeUnauthUser($userId)
   {
