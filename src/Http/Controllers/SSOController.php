@@ -81,7 +81,9 @@ class SSOController
   {
     $token = $request->bearerToken();
     if (!$token) {
-      return response()->json(['message' => 'Unauthorized.'], 403);
+      $request->session()->invalidate();
+      $request->session()->regenerateToken();
+      return response()->json(['status' => true], 200);
     }
 
     $this->oauthClient->logout($token);

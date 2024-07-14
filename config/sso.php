@@ -20,5 +20,5 @@ uXcoYv2AS1LCmlbu3F2M4N4LZwP6DFQKb4aO4Mr/Vp1gZssOCI0jM31EHhlm3RAR
 9QIDAQAB
 -----END PUBLIC KEY-----
 EOD,
-    'version' => '3.3.2'
+    'version' => '3.3.3'
 ];
