@@ -30,7 +30,7 @@ class OAuthClient
     $this->clientOrigin = Config::get('sso.client_origin');
     $this->scopes = Config::get('sso.scopes');
     $this->version = Config::get('sso.version');
-    $this->sslVerify = app()->isProduction() ? true : false;
+    $this->sslVerify = false;
   }
 
   public function addUnauthUser($userId, $clientSessionId)
