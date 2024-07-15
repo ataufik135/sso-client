@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
 use GuzzleHttp\Client;
 use GuzzleHttp\Promise;
+use stdClass;
 
 class OAuthClient
 {
@@ -127,28 +128,48 @@ class OAuthClient
       'verify' => $this->sslVerify,
     ]);
 
-    $response = $httpClient->post($this->host . '/api/oauth/token', [
-      'headers' => [
-        'Accept' => 'application/json',
-        'X-Forwarded-For' => $requestIp,
-        'client-version' => $this->version,
-      ],
-      'form_params' => [
-        'grant_type' => 'authorization_code',
-        'client_id' => $this->clientId,
-        'client_secret' => $this->clientSecret,
-        'redirect_uri' => $this->redirectUri,
-        'code_verifier' => $codeVerifier,
-        'code' => $code
-      ]
-    ]);
+    try {
+      $response = $httpClient->post($this->host . '/api/oauth/token', [
+        'headers' => [
+          'Accept' => 'application/json',
+          'X-Forwarded-For' => $requestIp,
+          'client-version' => $this->version,
+        ],
+        'form_params' => [
+          'grant_type' => 'authorization_code',
+          'client_id' => $this->clientId,
+          'client_secret' => $this->clientSecret,
+          'redirect_uri' => $this->redirectUri,
+          'code_verifier' => $codeVerifier,
+          'code' => $code
+        ]
+      ]);
 
-    if ($response->getStatusCode() === 409) {
-      return redirect($this->logoutUri);
+      $this->storeToken(json_decode($response->getBody()->getContents(), true));
+      $response = new stdClass();
+      $response->status = 200;
+      return $response;
+    } catch (\GuzzleHttp\Exception\RequestException $e) {
+      if ($e->getResponse()) {
+        $statusCode = $e->getResponse()->getStatusCode();
+        if ($statusCode === 409) {
+          return redirect()->away($this->logoutUri);
+        }
+        if ($e->getResponse()->getBody()) {
+          $this->storeToken(json_decode($e->getResponse()->getBody()->getContents(), true));
+        }
+
+        $response = new stdClass();
+        if ($statusCode === 400) {
+          $response->status = 400;
+          $response->message = json_decode($e->getResponse()->getBody()->getContents(), true);
+          return $response;
+        }
+
+        return false;
+      }
+      return false;
     }
-
-    $this->storeToken(json_decode($response->getBody(), true));
-    return $response;
   }
 
   public function logout($token)

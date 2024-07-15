@@ -50,12 +50,10 @@ class SSOController
     try {
       $response = $this->oauthClient->requestToken($request->code, $codeVerifier, $requestIp);
 
-      $statusCode = $response->getStatusCode();
-      $responseData = json_decode($response->getBody(), true);
-      if ($statusCode === 400) {
-        return response()->json($responseData, $statusCode);
+      if ($response->status === 400) {
+        return response()->json($response->message, $response->status);
       }
-      if ($statusCode === 200) {
+      if ($response->status === 200) {
         $user = $request->session()->get('user');
 
         $request->session()->regenerate();
