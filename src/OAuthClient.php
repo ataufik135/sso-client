@@ -4,7 +4,6 @@ namespace TaufikT\SsoClient;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use GuzzleHttp\Client;
 use GuzzleHttp\Promise;
@@ -19,6 +18,7 @@ class OAuthClient
   protected $clientOrigin;
   protected $scopes;
   protected $version;
+  protected $sslVerify;
 
   public function __construct()
   {
@@ -30,6 +30,7 @@ class OAuthClient
     $this->clientOrigin = Config::get('sso.client_origin');
     $this->scopes = Config::get('sso.scopes');
     $this->version = Config::get('sso.version');
+    $this->sslVerify = app()->isProduction() ? true : false;
   }
 
   public function addUnauthUser($userId, $clientSessionId)
@@ -94,21 +95,26 @@ class OAuthClient
   {
     $httpClient = new Client([
       'http_errors' => false,
-      'verify' => false
+      'verify' => $this->sslVerify,
     ]);
-    $promises = $httpClient->postAsync(
-      $this->host . '/api/online-users',
-      [
-        'headers' => [
-          'Accept' => 'application/json',
-          'client-id' => $this->clientId
-        ],
-        'form_params' => ['online_users' => $data]
-      ]
 
-    );
+    try {
+      $promises = $httpClient->postAsync(
+        $this->host . '/api/online-users',
+        [
+          'headers' => [
+            'Accept' => 'application/json',
+            'client-id' => $this->clientId
+          ],
+          'form_params' => ['online_users' => $data]
+        ]
 
-    Promise\Utils::settle($promises)->wait();
+      );
+
+      Promise\Utils::settle($promises)->wait();
+    } catch (\Exception $e) {
+      //throw $e;
+    }
   }
 
   public function storeToken($data)
@@ -117,48 +123,36 @@ class OAuthClient
   }
   public function requestToken($code, $codeVerifier, $requestIp)
   {
-    $response = Http::withoutVerifying()->withHeaders([
-      'X-Forwarded-For' => $requestIp,
-      'client-version' => $this->version,
-    ])->acceptJson()->asForm()->post(
-      $this->host . '/api/oauth/token',
-      [
-        'grant_type' => 'authorization_code',
-        'client_id' => $this->clientId,
-        'client_secret' => $this->clientSecret,
-        'redirect_uri' => $this->redirectUri,
-        'code_verifier' => $codeVerifier,
-        'code' => $code
-      ]
-    );
+    $httpClient = new Client([
+      'verify' => $this->sslVerify,
+    ]);
 
-    if ($response->status() === 409) {
-      return redirect($this->logoutUri);
+    try {
+      $response = $httpClient->post($this->host . '/api/oauth/token', [
+        'headers' => [
+          'Accept' => 'application/json',
+          'X-Forwarded-For' => $requestIp,
+          'client-version' => $this->version,
+        ],
+        'form_params' => [
+          'grant_type' => 'authorization_code',
+          'client_id' => $this->clientId,
+          'client_secret' => $this->clientSecret,
+          'redirect_uri' => $this->redirectUri,
+          'code_verifier' => $codeVerifier,
+          'code' => $code
+        ]
+      ]);
+
+      if ($response->getStatusCode() === 409) {
+        return redirect($this->logoutUri);
+      }
+
+      $this->storeToken(json_decode($response->getBody(), true));
+      return $response;
+    } catch (\Exception $e) {
+      return false;
     }
-
-    $this->storeToken($response->json());
-    return $response;
-  }
-
-  public function refreshToken()
-  {
-    $refresh_token = Session::get('refresh_token');
-    if (!$refresh_token) {
-      return redirect($this->clientOrigin);
-    }
-
-    $response = Http::withoutVerifying()->acceptJson()->asForm()->post(
-      $this->host . '/api/oauth/token',
-      [
-        'grant_type' => 'refresh_token',
-        'refresh_token' => $refresh_token,
-        'client_id' => $this->clientId,
-        'client_secret' => $this->clientSecret,
-        'scope' => $this->scopes,
-      ]
-    );
-
-    return $response->json();
   }
 
   public function logout($token)
