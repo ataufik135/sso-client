@@ -145,7 +145,7 @@ class OAuthClient
         ]
       ]);
 
-      $this->storeToken(json_decode($response->getBody()->getContents(), true));
+      $this->storeToken(json_decode($response->getBody(), true));
       $response = new stdClass();
       $response->status = 200;
       return $response;
@@ -156,13 +156,13 @@ class OAuthClient
           return redirect()->away($this->logoutUri);
         }
         if ($e->getResponse()->getBody()) {
-          $this->storeToken(json_decode($e->getResponse()->getBody()->getContents(), true));
+          $this->storeToken(json_decode($e->getResponse()->getBody(), true));
         }
 
         $response = new stdClass();
         if ($statusCode === 400) {
           $response->status = 400;
-          $response->message = json_decode($e->getResponse()->getBody()->getContents(), true);
+          $response->message = json_decode($e->getResponse()->getBody(), true);
           return $response;
         }
 
