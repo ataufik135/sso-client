@@ -127,32 +127,28 @@ class OAuthClient
       'verify' => $this->sslVerify,
     ]);
 
-    try {
-      $response = $httpClient->post($this->host . '/api/oauth/token', [
-        'headers' => [
-          'Accept' => 'application/json',
-          'X-Forwarded-For' => $requestIp,
-          'client-version' => $this->version,
-        ],
-        'form_params' => [
-          'grant_type' => 'authorization_code',
-          'client_id' => $this->clientId,
-          'client_secret' => $this->clientSecret,
-          'redirect_uri' => $this->redirectUri,
-          'code_verifier' => $codeVerifier,
-          'code' => $code
-        ]
-      ]);
+    $response = $httpClient->post($this->host . '/api/oauth/token', [
+      'headers' => [
+        'Accept' => 'application/json',
+        'X-Forwarded-For' => $requestIp,
+        'client-version' => $this->version,
+      ],
+      'form_params' => [
+        'grant_type' => 'authorization_code',
+        'client_id' => $this->clientId,
+        'client_secret' => $this->clientSecret,
+        'redirect_uri' => $this->redirectUri,
+        'code_verifier' => $codeVerifier,
+        'code' => $code
+      ]
+    ]);
 
-      if ($response->getStatusCode() === 409) {
-        return redirect($this->logoutUri);
-      }
-
-      $this->storeToken(json_decode($response->getBody(), true));
-      return $response;
-    } catch (\Exception $e) {
-      return false;
+    if ($response->getStatusCode() === 409) {
+      return redirect($this->logoutUri);
     }
+
+    $this->storeToken(json_decode($response->getBody(), true));
+    return $response;
   }
 
   public function logout($token)
