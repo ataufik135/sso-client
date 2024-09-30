@@ -41,6 +41,9 @@ class SSOController
     try {
       $token = $this->oauthClient->getToken($code, $codeVerifier, $requestIp);
       $userInfo = $this->oauthClient->getUserInfo($token['access_token']);
+      if (!isset($userInfo['id'])) {
+        $userInfo['id'] = $userInfo['sub'] ?? null;
+      }
 
       $request->session()->put($token);
       $request->session()->put('user', $userInfo);
