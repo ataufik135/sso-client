@@ -2,220 +2,197 @@
 
 namespace TaufikT\SsoClient;
 
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Session;
 use GuzzleHttp\Client;
-use GuzzleHttp\Promise;
-use stdClass;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\ClientException;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Session;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 class OAuthClient
 {
-  protected $host;
-  protected $logoutUri;
-  protected $clientId;
-  protected $clientSecret;
-  protected $redirectUri;
-  protected $clientOrigin;
-  protected $scopes;
-  protected $version;
-  protected $sslVerify;
+  protected $config;
+  protected $httpClient;
+  protected $discovery;
 
-  public function __construct()
+  public function __construct(array $config)
   {
-    $this->host = Config::get('sso.host');
-    $this->logoutUri = Config::get('sso.host_logout');
-    $this->clientId = Config::get('sso.client_id');
-    $this->clientSecret = Config::get(('sso.client_secret'));
-    $this->redirectUri = Config::get('sso.client_callback');
-    $this->clientOrigin = Config::get('sso.client_origin');
-    $this->scopes = Config::get('sso.scopes');
-    $this->version = Config::get('sso.version');
-    $this->sslVerify = false;
-  }
-
-  public function addUnauthUser($userId, $clientSessionId)
-  {
-    $users = Cache::get('unauthenticated-users');
-
-    $users[$userId] = [
-      'clientSessionId' => $clientSessionId
-    ];
-    Cache::forever('unauthenticated-users', $users);
-  }
-  public function removeUnauthUser($userId)
-  {
-    $users = Cache::get('unauthenticated-users');
-    unset($users[$userId]);
-    Cache::forever('unauthenticated-users', $users);
-  }
-  public function addAuthUser($userId, $sessionId, $clientSessionId)
-  {
-    $users = Cache::get('authenticated-users');
-
-    $users[$userId] = [
-      'sessionId' => $sessionId,
-      'clientSessionId' => $clientSessionId
-    ];
-    Cache::forever('authenticated-users', $users);
-  }
-  public function removeAuthUser($userId)
-  {
-    $users = Cache::get('authenticated-users');
-    unset($users[$userId]);
-    Cache::forever('authenticated-users', $users);
-  }
-  public function countAuthUser()
-  {
-    $users = Cache::get('authenticated-users');
-    return count($users);
-  }
-  public function getClientSessionIdUnauthUser($userId)
-  {
-    $clientSessionId = Cache::get('unauthenticated-users')[$userId]['clientSessionId'];
-    return $clientSessionId;
-  }
-  public function getClientSessionIdAuthUser($userId)
-  {
-    $clientSessionId = Cache::get('authenticated-users')[$userId]['clientSessionId'];
-    return $clientSessionId;
-  }
-  public function getAllUserIdAuthUser()
-  {
-    return array_keys(Cache::get('authenticated-users'));
-  }
-  public function checkUnauthUser($userId)
-  {
-    return isset(Cache::get('unauthenticated-users')[$userId]);
-  }
-  public function checkAuthUser($userId)
-  {
-    return isset(Cache::get('authenticated-users')[$userId]);
-  }
-  public function updateOnlineUsers($data)
-  {
-    $httpClient = new Client([
-      'http_errors' => false,
-      'verify' => $this->sslVerify,
+    $this->config = $config;
+    $this->httpClient = new Client([
+      'verify' => $this->config['ssl_verify'],
     ]);
 
-    try {
-      $promises = $httpClient->postAsync(
-        $this->host . '/api/online-users',
-        [
-          'headers' => [
-            'Accept' => 'application/json',
-            'client-id' => $this->clientId
-          ],
-          'form_params' => ['online_users' => $data]
-        ]
-
-      );
-
-      Promise\Utils::settle($promises)->wait();
-    } catch (\Exception $e) {
-      //throw $e;
-    }
+    $this->discover();
   }
 
-  public function storeToken($data)
+  protected function discover()
   {
-    Session::put($data);
+    $response = $this->httpClient->get($this->config['discovery_url']);
+    $this->discovery = json_decode($response->getBody(), true);
   }
-  public function requestToken($code, $codeVerifier, $requestIp)
+
+  public function getAuthorizationUrl($state, $codeChallenge)
   {
-    $httpClient = new Client([
-      'verify' => $this->sslVerify,
+    return $this->discovery['authorization_endpoint'] . '?' . http_build_query([
+      'response_type' => 'code',
+      'client_id' => $this->config['client_id'],
+      'redirect_uri' => $this->config['client_callback'],
+      'scope' => $this->config['scopes'],
+      'state' => $state,
+      'code_challenge' => $codeChallenge,
+      'code_challenge_method' => 'S256',
     ]);
+  }
 
+  public function getToken($code, $codeVerifier, $requestIp)
+  {
     try {
-      $response = $httpClient->post($this->host . '/api/oauth/token', [
+      $response = $this->httpClient->post($this->discovery['token_endpoint'], [
         'headers' => [
           'Accept' => 'application/json',
           'X-Forwarded-For' => $requestIp,
-          'client-version' => $this->version,
         ],
         'form_params' => [
           'grant_type' => 'authorization_code',
-          'client_id' => $this->clientId,
-          'client_secret' => $this->clientSecret,
-          'redirect_uri' => $this->redirectUri,
+          'client_id' => $this->config['client_id'],
+          'client_secret' => $this->config['client_secret'],
+          'redirect_uri' => $this->config['client_callback'],
           'code_verifier' => $codeVerifier,
-          'code' => $code
-        ]
+          'code' => $code,
+        ],
       ]);
 
-      $this->storeToken(json_decode($response->getBody(), true));
-      $response = new stdClass();
-      $response->status = 200;
-      return $response;
-    } catch (\GuzzleHttp\Exception\RequestException $e) {
-      if ($e->getResponse()) {
-        $statusCode = $e->getResponse()->getStatusCode();
-        if ($statusCode === 409) {
-          return redirect()->away($this->logoutUri);
-        }
-        if ($e->getResponse()->getBody()) {
-          $this->storeToken(json_decode($e->getResponse()->getBody(), true));
-        }
+      $tokenResponse = json_decode($response->getBody(), true);
 
-        $response = new stdClass();
-        if ($statusCode === 400) {
-          $response->status = 400;
-          $response->message = json_decode($e->getResponse()->getBody(), true);
-          return $response;
-        }
-
-        return false;
+      if (isset($tokenResponse['error'])) {
+        throw new \Exception("Error getting token: " . $tokenResponse['error_description']);
       }
+
+      return $tokenResponse;
+    } catch (ClientException $e) {
+      $response = $e->getResponse();
+      $statusCode = $response->getStatusCode();
+      $errorBody = json_decode($response->getBody(), true);
+
+      if (isset($errorBody['error'])) {
+        $errorMessage = $errorBody['error_description'] ?? 'Unknown error';
+        throw new \Exception("Token request failed: $errorMessage (HTTP $statusCode)");
+      }
+
+      throw new \Exception("Client error during token request: HTTP $statusCode");
+    } catch (RequestException $e) {
+      throw new \Exception("Network or server error: " . $e->getMessage());
+    } catch (\Exception $e) {
+      throw new \Exception("General error during token request: " . $e->getMessage());
+    }
+  }
+
+  public function getUserInfo($accessToken)
+  {
+    try {
+      $response = $this->httpClient->get($this->discovery['userinfo_endpoint'], [
+        'headers' => [
+          'Authorization' => 'Bearer ' . $accessToken,
+          'Accept' => 'application/json',
+        ],
+      ]);
+
+      return json_decode($response->getBody(), true);
+    } catch (\Exception $e) {
+      throw new \Exception("Failed to fetch userinfo: " . $e->getMessage());
+    }
+  }
+
+  public function getLogoutUrl($redirectUrl = null)
+  {
+    return $this->config['host_logout'] . '?client_id=' . $this->config['client_id'] . ($redirectUrl !== null ? '&post_logout_redirect_uri=' . $redirectUrl : '');
+  }
+
+  public function destroyAllSessions()
+  {
+    $sessionDriver = config('session.driver');
+    if ($sessionDriver !== 'file') {
+      return false;
+    }
+
+    $sessionPath = config('session.files');
+    $sessionFiles = File::files($sessionPath);
+    $sessionHandler = Session::getHandler();
+
+    foreach ($sessionFiles as $file) {
+      $sessionId = $file->getFilename();
+      $sessionHandler->destroy($sessionId);
+    }
+    return true;
+  }
+  public function destroySessionByUserId($userId)
+  {
+    $sessionDriver = config('session.driver');
+    if ($sessionDriver !== 'file') {
+      return false;
+    }
+
+    $sessionPath = config('session.files');
+    $sessionFiles = File::files($sessionPath);
+    $sessionHandler = Session::getHandler();
+
+    foreach ($sessionFiles as $file) {
+      $sessionData = $file->getContents();
+
+      if (strpos($sessionData, $userId) !== false) {
+        $sessionId = $file->getFilename();
+        $sessionHandler->destroy($sessionId);
+      }
+    }
+    return true;
+  }
+
+  public function verifyToken($token)
+  {
+    try {
+      $jwksUri = $this->discovery['jwks_uri'];
+      $jwksResponse = $this->httpClient->get($jwksUri);
+      $jwksKeys = json_decode($jwksResponse->getBody(), true);
+      $publicKey = $this->getPublicKeyFromJWKS($jwksKeys['keys'][0]);
+      $decodedToken = JWT::decode($token, new Key($publicKey, 'RS256'));
+      return $decodedToken;
+    } catch (\Exception $e) {
       return false;
     }
   }
 
-  public function logout($token)
+  protected function getPublicKeyFromJWKS($jwks)
   {
-    $jwtToken = jwtDecrypt($token);
-    $this->destroySessionById(base64_decode($jwtToken->id));
-  }
+    $modulus = JWT::urlsafeB64Decode($jwks['n']);
+    $exponent = JWT::urlsafeB64Decode($jwks['e']);
 
-  private function destroySessionById($userId)
+    $components = [
+      'modulus' => pack('Ca*a*', 2, $this->encodeLength(strlen($modulus)), $modulus),
+      'publicExponent' => pack('Ca*a*', 2, $this->encodeLength(strlen($exponent)), $exponent)
+    ];
+
+    $rsaPublicKey = pack(
+      'Ca*a*a*',
+      48,
+      $this->encodeLength(strlen($components['modulus']) + strlen($components['publicExponent'])),
+      $components['modulus'],
+      $components['publicExponent']
+    );
+
+    $rsaPublicKeyPem = "-----BEGIN PUBLIC KEY-----\r\n" .
+      chunk_split(base64_encode($rsaPublicKey), 64) .
+      "-----END PUBLIC KEY-----";
+
+    return $rsaPublicKeyPem;
+  }
+  protected function encodeLength($length)
   {
-    if ($this->checkAuthUser($userId)) {
-      $clientSessionId = $this->getClientSessionIdAuthUser($userId);
-      $this->removeAuthUser($userId);
-    } else {
-      $clientSessionId = $this->getClientSessionIdUnauthUser($userId);
-      $this->removeUnauthUser($userId);
+    if ($length <= 0x7F) {
+      return chr($length);
     }
-    Session::getHandler()->destroy($clientSessionId);
-  }
 
-  public function host()
-  {
-    return $this->host;
-  }
-  public function logoutUri()
-  {
-    return $this->logoutUri;
-  }
-  public function clientId()
-  {
-    return $this->clientId;
-  }
-  public function clientSecret()
-  {
-    return $this->clientSecret;
-  }
-  public function redirectUri()
-  {
-    return $this->redirectUri;
-  }
-  public function clientOrigin()
-  {
-    return $this->clientOrigin;
-  }
-  public function scopes()
-  {
-    return $this->scopes;
+    $temp = ltrim(pack('N', $length), chr(0));
+    return pack('Ca*', 0x80 | strlen($temp), $temp);
   }
 }

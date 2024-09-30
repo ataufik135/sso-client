@@ -3,7 +3,6 @@
 namespace TaufikT\SsoClient\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use TaufikT\SsoClient\OAuthClient;
 
@@ -24,70 +23,80 @@ class SSOController
     $request->session()->put('code_verifier', $code_verifier = Str::random(128));
     $codeChallenge = strtr(rtrim(base64_encode(hash('sha256', $code_verifier, true)), '='), '+/', '-_');
 
-    $query = http_build_query([
-      'response_type' => 'code',
-      'client_id' => $this->oauthClient->clientId(),
-      'redirect_uri' => $this->oauthClient->redirectUri(),
-      'scope' => $this->oauthClient->scopes(),
-      'state' => $state,
-      'code_challenge' => $codeChallenge,
-      'code_challenge_method' => 'S256',
-    ]);
-
-    return redirect($this->oauthClient->host() . '/oauth/authorize?' . $query);
+    return redirect($this->oauthClient->getAuthorizationUrl($state, $codeChallenge));
   }
+
   public function callback(Request $request)
   {
     $requestUrl = $request->session()->pull('request_url');
     $requestIp = $request->session()->pull('request_ip');
     $state = $request->session()->pull('state');
     $codeVerifier = $request->session()->pull('code_verifier');
+    $code = $request->code;
 
     if (strlen($state) < 1 && $state !== $request->state) {
       return response()->json(['message' => 'Invalid state value.'], 400);
     }
 
     try {
-      $response = $this->oauthClient->requestToken($request->code, $codeVerifier, $requestIp);
+      $token = $this->oauthClient->getToken($code, $codeVerifier, $requestIp);
+      $userInfo = $this->oauthClient->getUserInfo($token['access_token']);
 
-      if ($response->status === 400) {
-        return response()->json($response->message, $response->status);
-      }
-      if ($response->status === 200) {
-        $user = $request->session()->get('user');
-
-        $request->session()->regenerate();
-        $clientSessionId = Session::getId();
-        $this->oauthClient->addAuthUser($user['id'], $user['sessionId'], $clientSessionId);
-        return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
-      }
-
-      $userId = $request->session()->get('userId');
-      $clientSessionId = Session::getId();
-      $this->oauthClient->addUnauthUser($userId, $clientSessionId);
-      throw new \Exception('Unauthorized.');
+      $request->session()->put($token);
+      $request->session()->put('user', $userInfo);
+      $request->session()->regenerate();
+      return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
     } catch (\Exception $e) {
-      abort(403);
+      return response()->json([
+        'error' => 'Token or userinfo request failed',
+        'message' => $e->getMessage(),
+      ], 500);
     }
   }
 
   public function logout(Request $request)
   {
+    $redirectUrl = $request->query('redirect', null);
     $request->session()->invalidate();
     $request->session()->regenerateToken();
-    return redirect($this->oauthClient->logoutUri());
+    return redirect()->away($this->oauthClient->getLogoutUrl($redirectUrl));
   }
 
-  public function handleLogoutNotification(Request $request)
+  public function backchannelLogout(Request $request)
   {
     $token = $request->bearerToken();
     if (!$token) {
       $request->session()->invalidate();
       $request->session()->regenerateToken();
-      return response()->json(['status' => true], 200);
+      return response()->json([], 200);
     }
 
-    $this->oauthClient->logout($token);
-    return response()->json(['message' => 'You have been logged out!'], 200);
+    $token = $this->oauthClient->verifyToken($token);
+    if ($token['aud'] === config('sso.client_id')) {
+      if ($token['sub']) {
+        $response = $this->oauthClient->destroySessionByUserId($token['sub']);
+        if (!$response) {
+          return response()->json([
+            'error' => 'Logout request unsuccessful',
+            'message' => 'The user logout attempt has failed.'
+          ], 500);
+        }
+      }
+
+      if ($token['event'] === "destroy all sessions") {
+        $response = $this->oauthClient->destroyAllSessions();
+        if ($response) {
+          return response()->json([
+            'success' => 'Destroy all sessions successful',
+            'message' => 'All session has been destroyed successfully.'
+          ], 200);
+        }
+      }
+    }
+
+    return response()->json([
+      'success' => 'Logout successful',
+      'message' => 'The user has been logged out successfully.!'
+    ], 200);
   }
 }

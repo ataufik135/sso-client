@@ -16,7 +16,7 @@ class SSOServiceProvider extends ServiceProvider
   public function register(): void
   {
     $this->app->bind('oauthclient', function ($app) {
-      return new OAuthClient();
+      return new OAuthClient(config('sso'));
     });
   }
 
@@ -27,7 +27,7 @@ class SSOServiceProvider extends ServiceProvider
   {
     $this->publishes([
       __DIR__ . '/../config/' . $this->configFileName => $this->getConfigPath(),
-    ], 'laravel-assets');
+    ]);
     $this->loadRoutes();
 
     Blade::directive('ssoRole', function ($role) {

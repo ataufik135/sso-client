@@ -11,8 +11,6 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
     SSO_CLIENT_ID="9a490422-0cdb-48bb-8ea4-c816786089f4"
     SSO_CLIENT_SECRET="VNj0KAWJp2IfSlk2c7L67jdrPPhc0apMZVgDiSxs"
     SSO_CLIENT_CALLBACK="https://app.client.com/oauth2/callback"
-    SSO_CLIENT_ORIGIN="https://app.client.com"
-    SSO_SCOPES=""
     SSO_HOST="https://sso.server.com"
     SSO_HOST_LOGOUT="https://sso.server.com/logout"
 
@@ -83,4 +81,4 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
 
 ### Logout URL
 
-    <a href="{{ route('oauth2.logout') }}">Logout</a>
+    <a href="{{ route('oauth2.logout', ['redirect' => 'https://your-redirect-url.com']) }}">Logout</a>

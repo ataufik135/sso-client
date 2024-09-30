@@ -6,17 +6,9 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Providers\RouteServiceProvider;
-use TaufikT\SsoClient\OAuthClient;
 
 class RedirectIfAuthenticated
 {
-  protected $oauthClient;
-
-  public function __construct(OAuthClient $oauthClient)
-  {
-    $this->oauthClient = $oauthClient;
-  }
-
   /**
    * Handle an incoming request.
    *
@@ -26,15 +18,10 @@ class RedirectIfAuthenticated
   {
     $user = $request->session()->get('user');
 
-    if (!$user || !$this->isUserAuthenticated($user['id'])) {
+    if (!$user) {
       return $next($request);
     }
 
     return redirect(RouteServiceProvider::HOME);
-  }
-
-  private function isUserAuthenticated($userId)
-  {
-    return $this->oauthClient->checkAuthUser($userId);
   }
 }
