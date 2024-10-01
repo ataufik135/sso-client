@@ -7,6 +7,8 @@ use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ClientException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Session;
+use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Math\BigInteger;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
@@ -155,7 +157,7 @@ class OAuthClient
       $jwksResponse = $this->httpClient->get($jwksUri);
       $jwksKeys = json_decode($jwksResponse->getBody(), true);
       $publicKey = $this->getPublicKeyFromJWKS($jwksKeys['keys'][0]);
-      $decodedToken = JWT::decode($token, new Key($publicKey, 'RS256'));
+      $decodedToken = JWT::decode($token, new Key($publicKey, $jwksKeys['keys'][0]['alg']));
       return $decodedToken;
     } catch (\Exception $e) {
       return false;
@@ -164,35 +166,27 @@ class OAuthClient
 
   protected function getPublicKeyFromJWKS($jwks)
   {
-    $modulus = JWT::urlsafeB64Decode($jwks['n']);
-    $exponent = JWT::urlsafeB64Decode($jwks['e']);
+    $e = $jwks['e'];
+    $n = $jwks['n'];
 
-    $components = [
-      'modulus' => pack('Ca*a*', 2, $this->encodeLength(strlen($modulus)), $modulus),
-      'publicExponent' => pack('Ca*a*', 2, $this->encodeLength(strlen($exponent)), $exponent)
-    ];
+    $publicKey = PublicKeyLoader::load([
+      'e' => new BigInteger(JWT::urlsafeB64Decode($e), 256),
+      'n' => new BigInteger(JWT::urlsafeB64Decode($n), 256),
+    ])->withHash('sha1');
 
-    $rsaPublicKey = pack(
-      'Ca*a*a*',
-      48,
-      $this->encodeLength(strlen($components['modulus']) + strlen($components['publicExponent'])),
-      $components['modulus'],
-      $components['publicExponent']
-    );
 
-    $rsaPublicKeyPem = "-----BEGIN PUBLIC KEY-----\r\n" .
-      chunk_split(base64_encode($rsaPublicKey), 64) .
-      "-----END PUBLIC KEY-----";
-
-    return $rsaPublicKeyPem;
+    return $this->convertToPEM($publicKey);
   }
-  protected function encodeLength($length)
-  {
-    if ($length <= 0x7F) {
-      return chr($length);
-    }
 
-    $temp = ltrim(pack('N', $length), chr(0));
-    return pack('Ca*', 0x80 | strlen($temp), $temp);
+  protected function convertToPEM($publicKey)
+  {
+    $pemPublicKey = $publicKey->toString('PKCS8');
+    $pemPublicKey = preg_replace('/-----BEGIN PUBLIC KEY-----/', '', $pemPublicKey);
+    $pemPublicKey = preg_replace('/-----END PUBLIC KEY-----/', '', $pemPublicKey);
+    $pemPublicKey = preg_replace('/\s+/', '', $pemPublicKey);
+    $pemPublicKey = chunk_split($pemPublicKey, 64, "\n");
+    $pemPublicKey = "-----BEGIN PUBLIC KEY-----\n" . $pemPublicKey . "-----END PUBLIC KEY-----\n";
+
+    return $pemPublicKey;
   }
 }
