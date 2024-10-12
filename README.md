@@ -30,14 +30,6 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
 
 ##### app/Http/Kernel.php
 
-    protected $middlewareGroups = [
-        'web' => [
-        // ...
-            \TaufikT\SsoClient\Http\Middleware\UserActivity::class,
-        ],
-        // ...
-    ];
-
     protected $middlewareAliases = [
         // ...
         'sso.auth' => \TaufikT\SsoClient\Http\Middleware\Authenticate::class,
@@ -53,11 +45,8 @@ Integrate Laravel Framework with Single Sign-On (SSO) Client using OAuth2.
     Route::group(['middleware' => ['sso.guest']], function () {
         // unauthenticated users only
     });
-    Route::group(['middleware' => ['sso.role:user']], function () {
-        // users with specified role only
-    });
-    Route::group(['middleware' => ['sso.role:user|admin|manager']], function () {
-        // users with specified roles only
+    Route::group(['middleware' => ['sso.auth', 'sso.role:user']], function () {
+        // authenticated users with specified role only
     });
     Route::group(['middleware' => ['sso.auth', 'sso.role:user|admin|manager']], function () {
         // authenticated users with specified roles only
