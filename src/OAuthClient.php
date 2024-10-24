@@ -128,7 +128,7 @@ class OAuthClient
     }
     return true;
   }
-  public function destroySessionByUserId($userId)
+  public function destroySessionByUserId($userId, $currentSid = null)
   {
     $sessionDriver = config('session.driver');
     if ($sessionDriver !== 'file') {
@@ -141,9 +141,13 @@ class OAuthClient
 
     foreach ($sessionFiles as $file) {
       $sessionData = $file->getContents();
+      $sessionId = $file->getFilename();
+
+      if (isset($currentSid) && $sessionId === $currentSid) {
+        continue;
+      }
 
       if (strpos($sessionData, $userId) !== false) {
-        $sessionId = $file->getFilename();
         $sessionHandler->destroy($sessionId);
       }
     }

@@ -3,6 +3,7 @@
 namespace TaufikT\SsoClient\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use TaufikT\SsoClient\OAuthClient;
 
@@ -57,6 +58,9 @@ class SSOController
       $request->session()->put($token);
       $request->session()->put('user', $userInfo);
       $request->session()->regenerate();
+      $currentSid = Session::getId();
+      $this->oauthClient->destroySessionByUserId($token->sub, $currentSid);
+
       return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
     } catch (\Exception $e) {
       return response()->json([
