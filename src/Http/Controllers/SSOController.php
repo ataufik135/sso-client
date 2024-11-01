@@ -59,7 +59,7 @@ class SSOController
       $request->session()->put('user', $userInfo);
       $request->session()->regenerate();
       $currentSid = Session::getId();
-      $this->oauthClient->destroySessionByUserId($token->sub, $currentSid);
+      $this->oauthClient->destroySessionByUserId($userInfo['sub'], $currentSid);
 
       return $requestUrl !== null ? redirect($requestUrl) : redirect()->intended('/');
     } catch (\Exception $e) {
